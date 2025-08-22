@@ -16,7 +16,7 @@ export class TattooArtistController {
     return this.tattooArtistService.search({
       bbox,
       styles,
-      countryCode: query.countryCode ?? null,
+      countryCode: query.countryCode ? query.countryCode.trim() : null,
       q: query.q ?? null,
       hasPhotos: query.hasPhotos === 'true',
       hasAvatar: query.hasAvatar === 'true',

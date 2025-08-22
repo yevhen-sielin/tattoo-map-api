@@ -4,6 +4,7 @@ export type SeedArtist = {
   nickname: string;
   city: string;
   country: string;
+  countryCode?: string | null;
   address: string;
   description: string;
   styles: string[];
@@ -115,6 +116,7 @@ export function makeRandomUsers(count: number): SeedUser[] {
         nickname,
         city,
         country: 'Netherlands',
+        countryCode: 'NL',
         address,
         description: 'Tattoo artist in NL. Auto-generated seed profile.',
         styles,
@@ -140,6 +142,7 @@ export const defaultSeedUsers: SeedUser[] = [
       nickname: 'eva.noir',
       city: 'Amsterdam',
       country: 'Netherlands',
+      countryCode: 'NL',
       address: 'Damstraat 21',
       description: 'Specializes in blackwork and geometric tattoos.',
       styles: ['blackwork', 'geometric'],
@@ -160,6 +163,7 @@ export const defaultSeedUsers: SeedUser[] = [
       nickname: 'leo.ink',
       city: 'Rotterdam',
       country: 'Netherlands',
+      countryCode: 'NL',
       address: 'Nieuwe Binnenweg 44',
       description: 'Portrait and realism expert.',
       styles: ['realism', 'portrait'],

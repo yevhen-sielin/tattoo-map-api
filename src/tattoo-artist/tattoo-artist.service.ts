@@ -80,7 +80,8 @@ export class TattooArtistService {
     const NOT: Prisma.ArtistWhereInput[] = [];
 
     if (cc) {
-      AND.push({ countryCode: cc });
+      // case-insensitive equality without changing existing rows
+      AND.push({ countryCode: { in: [cc, cc.toLowerCase()] } as any });
     }
 
     if (params.styles?.length) {
