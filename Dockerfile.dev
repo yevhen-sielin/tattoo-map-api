@@ -1,0 +1,24 @@
+# apps/api – DEV image with pnpm
+FROM node:20-alpine
+
+ENV NODE_ENV=development \
+    PNPM_HOME=/root/.local/share/pnpm \
+    NEXT_TELEMETRY_DISABLED=1
+
+# enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+
+WORKDIR /app
+ENV NODE_ENV=development
+RUN corepack enable
+
+# install deps using lockfile (best cache)
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --prefer-offline
+
+# project sources
+COPY . .
+RUN chmod +x ./entrypoint.dev.sh
+
+EXPOSE 3000
+CMD ["./entrypoint.dev.sh"]

@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  googleId  String   @unique
+  name      String?
+  avatar    String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+
+  artist    Artist?
+}
+
+model Artist {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id])
+
+  city        String
+  country     String
+  countryCode String?  @db.VarChar(2)
+  address     String
+  nickname    String
+  description String
+  styles      String[]
+  instagram   String
+  avatar      String
+  photos      String[] @default([])
+  lat         Decimal? @db.Decimal(9, 6)
+  lon         Decimal? @db.Decimal(9, 6)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([countryCode])
+  @@index([lat, lon])
+}
