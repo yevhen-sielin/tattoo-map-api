@@ -40,6 +40,9 @@ model Artist {
   styles      String[]
   instagram   String
   avatar      String
+  beginner    Boolean  @default(false)
+  color       Boolean  @default(false)
+  blackAndGray Boolean @default(false)
   photos      String[] @default([])
   lat         Decimal? @db.Decimal(9, 6)
   lon         Decimal? @db.Decimal(9, 6)

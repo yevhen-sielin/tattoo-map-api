@@ -18,8 +18,9 @@ export class TattooArtistController {
       styles,
       countryCode: query.countryCode ? query.countryCode.trim() : null,
       q: query.q ?? null,
-      hasPhotos: query.hasPhotos === 'true',
-      hasAvatar: query.hasAvatar === 'true',
+      beginner: query.beginner === 'true',
+      color: query.color === 'true',
+      blackAndGray: query.blackAndGray === 'true',
       limit: query.limit ?? 500,
     });
   }
@@ -42,7 +43,6 @@ export class TattooArtistController {
       description: string;
       styles: string[];
       instagram: string;
-      avatar: string;
       photos?: string[];
       lat?: number | null;
       lon?: number | null;

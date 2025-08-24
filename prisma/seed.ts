@@ -18,7 +18,7 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
       avatar: u.avatar ?? null,
       role: u.role ?? 'USER',
       artist: {
-        create: {
+        create: ({
           nickname: u.artist.nickname,
           city: u.artist.city,
           country: u.artist.country,
@@ -28,9 +28,13 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
           styles: u.artist.styles,
           instagram: u.artist.instagram,
           avatar: u.artist.avatar,
+          beginner: Boolean(u.artist.beginner ?? false),
+          color: Boolean(u.artist.color ?? false),
+          blackAndGray: Boolean(u.artist.blackAndGray ?? false),
+          photos: Array.isArray(u.artist.photos) ? u.artist.photos : [],
           lat: toDecimal6(u.artist.lat),
           lon: toDecimal6(u.artist.lon),
-        },
+        } as any),
       },
     },
     update: {
@@ -40,7 +44,7 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
       role: u.role ?? 'USER',
       artist: {
         upsert: {
-          create: {
+          create: ({
             nickname: u.artist.nickname,
             city: u.artist.city,
             country: u.artist.country,
@@ -50,10 +54,14 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
             styles: u.artist.styles,
             instagram: u.artist.instagram,
             avatar: u.artist.avatar,
+            beginner: Boolean(u.artist.beginner ?? false),
+            color: Boolean(u.artist.color ?? false),
+            blackAndGray: Boolean(u.artist.blackAndGray ?? false),
+            photos: Array.isArray(u.artist.photos) ? u.artist.photos : [],
             lat: toDecimal6(u.artist.lat),
             lon: toDecimal6(u.artist.lon),
-          },
-          update: {
+          } as any),
+          update: ({
             nickname: u.artist.nickname,
             city: u.artist.city,
             country: u.artist.country,
@@ -63,9 +71,13 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
             styles: u.artist.styles,
             instagram: u.artist.instagram,
             avatar: u.artist.avatar,
+            beginner: Boolean(u.artist.beginner ?? false),
+            color: Boolean(u.artist.color ?? false),
+            blackAndGray: Boolean(u.artist.blackAndGray ?? false),
+            photos: Array.isArray(u.artist.photos) ? u.artist.photos : [],
             lat: toDecimal6(u.artist.lat),
             lon: toDecimal6(u.artist.lon),
-          },
+          } as any),
         },
       },
     },

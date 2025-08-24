@@ -10,6 +10,10 @@ export type SeedArtist = {
   styles: string[];
   instagram: string;
   avatar: string;
+  beginner?: boolean;
+  color?: boolean;
+  blackAndGray?: boolean;
+  photos?: string[];
   lat?: number | null;
   lon?: number | null;
 };
@@ -105,6 +109,10 @@ export function makeRandomUsers(count: number): SeedUser[] {
     const avatar = `https://i.pravatar.cc/300?img=${(i % 70) + 1}`;
     const instagram = `https://instagram.com/${nickname}`;
 
+    // Independent flags (not mutually exclusive)
+    const doesBlackAndGray = Math.random() < (styles.includes('blackwork') ? 0.8 : 0.35);
+    const doesColor = Math.random() < 0.7; // can be true even if black & gray is true
+
     users.push({
       id: `seed-user-${i + 1}`,
       email,
@@ -122,6 +130,9 @@ export function makeRandomUsers(count: number): SeedUser[] {
         styles,
         instagram,
         avatar,
+        beginner: Math.random() < 0.2,
+        blackAndGray: doesBlackAndGray,
+        color: doesColor,
         lat: randomNlLat(),
         lon: randomNlLon(),
       },

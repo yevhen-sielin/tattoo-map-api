@@ -49,13 +49,18 @@ export class SearchArtistsDto {
   @IsString()
   q?: string; // search by nickname/city
 
+  // Work type flags
   @IsOptional()
   @IsBooleanString()
-  hasPhotos?: string;
+  beginner?: string;
 
   @IsOptional()
   @IsBooleanString()
-  hasAvatar?: string;
+  color?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  blackAndGray?: string;
 
   @IsOptional()
   @Transform(({ value }) => (value !== undefined ? Number(value) : 500))

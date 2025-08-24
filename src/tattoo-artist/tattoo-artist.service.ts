@@ -10,8 +10,9 @@ type SearchParams = {
   styles: string[];
   countryCode: string | null;
   q: string | null;
-  hasPhotos: boolean;
-  hasAvatar: boolean;
+  beginner?: boolean;
+  color?: boolean;
+  blackAndGray?: boolean;
   limit: number;
   // optional future-proofing
   skip?: number;
@@ -109,14 +110,16 @@ export class TattooArtistService {
       );
     }
 
-    if (params.hasPhotos) {
-      // array is not empty
-      NOT.push({ photos: { equals: [] } });
+    if (params.beginner === true) {
+      AND.push({ beginner: true } as any);
     }
 
-    if (params.hasAvatar) {
-      // non-empty and not null
-      AND.push({ avatar: { notIn: ['', null] } as any });
+    if (params.color === true) {
+      AND.push({ color: true } as any);
+    }
+
+    if (params.blackAndGray === true) {
+      AND.push({ blackAndGray: true } as any);
     }
 
     // Bounding box:
@@ -243,10 +246,12 @@ export class TattooArtistService {
       description: string;
       styles: string[];
       instagram: string;
-      avatar: string;
       photos?: string[];
       lat?: number | null;
       lon?: number | null;
+      beginner?: boolean;
+      color?: boolean;
+      blackAndGray?: boolean;
     },
   ) {
     // Normalize inputs
@@ -264,16 +269,21 @@ export class TattooArtistService {
       description: data.description,
       styles: data.styles,
       instagram: data.instagram,
-      avatar: data.avatar,
       photos: Array.isArray(data.photos) ? data.photos : [],
       lat: this.toDec6(data.lat),
       lon: this.toDec6(data.lon),
+      beginner: Boolean(data.beginner),
+      color: Boolean(data.color),
+      blackAndGray: Boolean(data.blackAndGray),
     };
+
+    // Ensure avatar is sourced from the User profile on first create
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     return this.prisma.artist.upsert({
       where: { userId },
-      update: payload,
-      create: { userId, ...payload },
+      update: payload, // do not change avatar on update via this endpoint
+      create: { userId, ...payload, avatar: user?.avatar ?? '' },
     });
   }
 }
