@@ -1,5 +1,5 @@
 // tattoo-artist.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -60,8 +60,11 @@ export class TattooArtistService {
   }
 
   async findByUserId(userId: string) {
-    const a = await this.prisma.artist.findUnique({ where: { userId } });
-    return a ? this.mapArtist(a) : null;
+    const [a, count] = await Promise.all([
+      this.prisma.artist.findUnique({ where: { userId } }),
+      this.prisma.like.count({ where: { artistId: userId } }),
+    ]);
+    return a ? { ...this.mapArtist(a), likes: count } : null;
   }
 
   async search(params: SearchParams) {
@@ -85,7 +88,15 @@ export class TattooArtistService {
     }
 
     if (params.styles?.length) {
-      AND.push({ styles: { hasSome: params.styles } });
+      const toTitle = (s: string) => s
+        .toLowerCase()
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      const styleVariants = Array.from(new Set(
+        params.styles.flatMap((s) => [s, s.toLowerCase(), s.toUpperCase(), toTitle(s)])
+      ));
+      AND.push({ styles: { hasSome: styleVariants } });
     }
 
     if (params.q?.trim()) {
@@ -178,7 +189,47 @@ export class TattooArtistService {
       });
     }
 
-    return normalized;
+    // attach likes counts
+    const counts = await this.prisma.like.groupBy({ by: ['artistId'], _count: { artistId: true }, where: { artistId: { in: normalized.map(a => a.userId) } } });
+    const mapCount = new Map(counts.map(c => [c.artistId, c._count.artistId]));
+    return normalized.map(a => ({ ...a, likes: mapCount.get(a.userId) ?? 0 }));
+  }
+
+  async likeArtist(userId: string, artistId: string) {
+    // Validate inputs
+    if (!userId || !artistId) {
+      throw new BadRequestException('userId and artistId are required');
+    }
+
+    const [user, artist] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: userId } }),
+      this.prisma.artist.findUnique({ where: { userId: artistId } }),
+    ]);
+    if (!user) {
+      throw new NotFoundException('User not found. Please authenticate to create a like.');
+    }
+    if (!artist) {
+      throw new NotFoundException('Artist not found');
+    }
+
+    await this.prisma.like.upsert({
+      where: { userId_artistId: { userId, artistId } },
+      create: { userId, artistId },
+      update: {},
+    });
+    const count = await this.prisma.like.count({ where: { artistId } });
+    return { artistId, likes: count };
+  }
+
+  async unlikeArtist(userId: string, artistId: string) {
+    await this.prisma.like.delete({ where: { userId_artistId: { userId, artistId } } }).catch(() => {});
+    const count = await this.prisma.like.count({ where: { artistId } });
+    return { artistId, likes: count };
+  }
+
+  async isLikedBy(userId: string, artistId: string) {
+    const like = await this.prisma.like.findUnique({ where: { userId_artistId: { userId, artistId } } });
+    return { artistId, liked: Boolean(like) };
   }
 
   async upsertForCurrentUser(

@@ -86,11 +86,40 @@ async function main(): Promise<void> {
   ];
 
   console.info(`Seeding ${users.length} users/artists...`);
+  const createdUserIds: string[] = [];
   await prisma.$transaction(async (tx) => {
     for (const u of users) {
-      await upsertUserWithArtist(tx as unknown as PrismaClient, u);
+      const user = await upsertUserWithArtist(tx as unknown as PrismaClient, u);
+      createdUserIds.push(user.id);
     }
   });
+
+  // Create some initial likes to showcase the UI
+  try {
+    const artistIds = (await prisma.artist.findMany({ select: { userId: true } })).map((a) => a.userId);
+    const pairs = new Set<string>();
+    const likesData: { userId: string; artistId: string }[] = [];
+    for (const uid of createdUserIds) {
+      const sampleCount = Math.max(1, Math.min(3, Math.floor(Math.random() * 4))); // 1..3 likes per user
+      const shuffled = [...artistIds].sort(() => Math.random() - 0.5);
+      let added = 0;
+      for (const aid of shuffled) {
+        if (aid === uid) continue; // do not like self
+        const key = `${uid}:${aid}`;
+        if (pairs.has(key)) continue;
+        pairs.add(key);
+        likesData.push({ userId: uid, artistId: aid });
+        added++;
+        if (added >= sampleCount) break;
+      }
+    }
+    if (likesData.length) {
+      await prisma.like.createMany({ data: likesData, skipDuplicates: true });
+      console.info(`👍 Seeded ${likesData.length} likes`);
+    }
+  } catch (e) {
+    console.warn('Seed likes skipped:', e);
+  }
 
   console.info('✅ Seeding complete');
 }

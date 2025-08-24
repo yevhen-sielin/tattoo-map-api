@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards, Delete } from '@nestjs/common';
 import { TattooArtistService } from './tattoo-artist.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/auth.controller';
@@ -50,5 +50,23 @@ export class TattooArtistController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.tattooArtistService.upsertForCurrentUser(user.sub, body);
+  }
+
+  @Post(':id/like')
+  @UseGuards(JwtAuthGuard)
+  async like(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {
+    return this.tattooArtistService.likeArtist(user.sub, artistId);
+  }
+
+  @Delete(':id/like')
+  @UseGuards(JwtAuthGuard)
+  async unlike(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {
+    return this.tattooArtistService.unlikeArtist(user.sub, artistId);
+  }
+
+  @Get(':id/like')
+  @UseGuards(JwtAuthGuard)
+  async isLiked(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {
+    return this.tattooArtistService.isLikedBy(user.sub, artistId);
   }
 }

@@ -24,6 +24,7 @@ model User {
   createdAt DateTime @default(now())
 
   artist    Artist?
+  likes     Like[]   @relation("UserLikes")
 }
 
 model Artist {
@@ -45,6 +46,22 @@ model Artist {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
+  likes       Like[]   @relation("ArtistLikes")
+
   @@index([countryCode])
   @@index([lat, lon])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  artistId  String   @map("artist_id")
+  createdAt DateTime @default(now())
+
+  user   User   @relation(name: "UserLikes", fields: [userId], references: [id])
+  artist Artist @relation(name: "ArtistLikes", fields: [artistId], references: [userId])
+
+  @@unique([userId, artistId])
+  @@index([artistId])
+  @@map("likes")
 }

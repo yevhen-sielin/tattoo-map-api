@@ -101,14 +101,56 @@ export class AuthController {
   async getMe(@CurrentUser() user: JwtUser) {
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.sub },
-      select: { id: true, role: true, name: true, avatar: true },
+      select: {
+        id: true,
+        role: true,
+        name: true,
+        avatar: true,
+        artist: {
+          select: {
+            city: true,
+            country: true,
+            countryCode: true,
+            address: true,
+            nickname: true,
+            description: true,
+            styles: true,
+            instagram: true,
+            avatar: true,
+            photos: true,
+            lat: true,
+            lon: true,
+          },
+        },
+      },
     });
+
+    const toNum = (v: any) =>
+      v == null ? null : typeof v?.toNumber === 'function' ? v.toNumber() : Number(v);
+
+    const artist = dbUser?.artist
+      ? {
+          city: dbUser.artist.city,
+          country: dbUser.artist.country,
+          countryCode: dbUser.artist.countryCode,
+          address: dbUser.artist.address,
+          nickname: dbUser.artist.nickname,
+          description: dbUser.artist.description,
+          styles: dbUser.artist.styles,
+          instagram: dbUser.artist.instagram,
+          avatar: dbUser.artist.avatar,
+          photos: dbUser.artist.photos,
+          lat: toNum(dbUser.artist.lat),
+          lon: toNum(dbUser.artist.lon),
+        }
+      : null;
 
     return {
       sub: dbUser?.id ?? user.sub,
       role: dbUser?.role ?? user.role,
       name: dbUser?.name,
       avatar: dbUser?.avatar,
+      artist,
     };
   }
 
