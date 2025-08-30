@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  Delete,
+} from '@nestjs/common';
 import { TattooArtistService } from './tattoo-artist.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/auth.controller';
@@ -12,7 +21,12 @@ export class TattooArtistController {
   @Get()
   findAll(@Query() query: SearchArtistsDto) {
     const bbox = parseBbox(query);
-    const styles = query.styles ? query.styles.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const styles = query.styles
+      ? query.styles
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
     return this.tattooArtistService.search({
       bbox,
       styles,
@@ -43,6 +57,18 @@ export class TattooArtistController {
       description: string;
       styles: string[];
       instagram: string;
+      beginner?: boolean;
+      coverups?: boolean;
+      color?: boolean;
+      blackAndGray?: boolean;
+      email?: string | null;
+      website?: string | null;
+      tiktok?: string | null;
+      facebook?: string | null;
+      telegram?: string | null;
+      whatsapp?: string | null;
+      wechat?: string | null;
+      snapchat?: string | null;
       photos?: string[];
       lat?: number | null;
       lon?: number | null;

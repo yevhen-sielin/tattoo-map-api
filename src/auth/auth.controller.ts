@@ -8,20 +8,17 @@ import {
   ExecutionContext,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 import type { User as JwtUser } from './types';
 
-/**
- * Extracts the current user from req.user (after JwtAuthGuard)
- */
+type DecimalLike = { toNumber: () => number };
+
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest<Request>();
-    return request.user;
-  },
+  (_data: unknown, ctx: ExecutionContext) =>
+    ctx.switchToHttp().getRequest<Request>().user,
 );
 
 @Controller('auth')
@@ -31,71 +28,66 @@ export class AuthController {
     private readonly prisma: PrismaService,
   ) {}
 
-  /**
-   * Start Google OAuth flow.
-   * This endpoint only triggers Passport redirect to Google.
-   */
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleAuth(): Promise<void> {
-    // Passport handles the redirect to Google
+  // ==== helpers ====
+  private isProd() {
+    return process.env.NODE_ENV === 'production';
   }
 
-  /**
-   * Callback from Google OAuth.
-   * Sets an httpOnly cookie with JWT and redirects to frontend.
-   *
-   * ENV:
-   *  - FRONTEND_URL             (e.g. http://localhost:3001)
-   *  - FRONTEND_SUCCESS_PATH    (optional, default "/")
-   *  - COOKIE_DOMAIN            (optional, e.g. ".example.com" for prod)
-   */
+  private toNum(v: unknown): number | null {
+    if (v == null) return null;
+
+    if (typeof v === 'object' && v !== null && 'toNumber' in v) {
+      return (v as DecimalLike).toNumber();
+    }
+
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      return Number.isNaN(n) ? null : n;
+    }
+
+    return null;
+  }
+
+  private buildRedirectTarget(req: Request): string {
+    const origin =
+      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    const success = this.config.get<string>('FRONTEND_SUCCESS_PATH') ?? '/';
+
+    const rawState = typeof req.query.state === 'string' ? req.query.state : undefined;
+    const returnTo = rawState?.startsWith('/') ? rawState : undefined;
+
+    return `${origin.replace(/\/$/, '')}${returnTo ?? success}`;
+  }
+
+  private setAuthCookie(res: Response, token?: string) {
+    if (!token) return;
+    const cookieDomain = this.config.get<string>('COOKIE_DOMAIN') || undefined;
+    res.cookie('accessToken', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: this.isProd(),
+      domain: cookieDomain,
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  // ==== Google OAuth ====
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth(): Promise<void> {}
+
+  /** Callback от Google: ставим httpOnly cookie и редиректим на фронт */
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
-
-    // Frontend origin and success path
-    const frontendOrigin =
-      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
-    const successPath = this.config.get<string>('FRONTEND_SUCCESS_PATH') ?? '/';
-
-    // Support returnTo path via OAuth state (e.g. /profile)
-    let returnTo: string | undefined;
-    const rawState = typeof req.query.state === 'string' ? req.query.state : undefined;
-    if (rawState && rawState.startsWith('/')) {
-      returnTo = rawState;
-    }
-
-    // JWT is attached to req.user by the strategy
-    const payload = (req.user ?? {}) as { accessToken?: string };
-    const token = payload?.accessToken;
-
-    // Cookie options
-    const cookieDomain = this.config.get<string>('COOKIE_DOMAIN') || undefined;
-    const cookieOpts = {
-      httpOnly: true,
-      sameSite: 'lax' as const,
-      secure: isProd,
-      domain: cookieDomain,
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    };
-
-    if (token) {
-      res.cookie('accessToken', token, cookieOpts);
-    }
-
-    const target = `${frontendOrigin.replace(/\/$/, '')}${
-      returnTo ?? successPath
-    }`;
-
-    return res.redirect(302, target);
+    const token = (req.user as { accessToken?: string } | undefined)?.accessToken;
+    this.setAuthCookie(res, token);
+    return res.redirect(302, this.buildRedirectTarget(req));
   }
 
-  /**
-   * Returns the currently authenticated user (requires JWT)
-   */
+  // ==== Me / Logout ====
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getMe(@CurrentUser() user: JwtUser) {
@@ -116,6 +108,18 @@ export class AuthController {
             description: true,
             styles: true,
             instagram: true,
+            beginner: true,
+            coverups: true,
+            color: true,
+            blackAndGray: true,
+            email: true,
+            website: true,
+            tiktok: true,
+            facebook: true,
+            telegram: true,
+            whatsapp: true,
+            wechat: true,
+            snapchat: true,
             avatar: true,
             photos: true,
             lat: true,
@@ -124,9 +128,6 @@ export class AuthController {
         },
       },
     });
-
-    const toNum = (v: any) =>
-      v == null ? null : typeof v?.toNumber === 'function' ? v.toNumber() : Number(v);
 
     const artist = dbUser?.artist
       ? {
@@ -138,10 +139,22 @@ export class AuthController {
           description: dbUser.artist.description,
           styles: dbUser.artist.styles,
           instagram: dbUser.artist.instagram,
+          beginner: dbUser.artist.beginner,
+          coverups: dbUser.artist.coverups,
+          color: dbUser.artist.color,
+          blackAndGray: dbUser.artist.blackAndGray,
+          email: dbUser.artist.email,
+          website: dbUser.artist.website,
+          tiktok: dbUser.artist.tiktok,
+          facebook: dbUser.artist.facebook,
+          telegram: dbUser.artist.telegram,
+          whatsapp: dbUser.artist.whatsapp,
+          wechat: dbUser.artist.wechat,
+          snapchat: dbUser.artist.snapchat,
           avatar: dbUser.artist.avatar,
           photos: dbUser.artist.photos,
-          lat: toNum(dbUser.artist.lat),
-          lon: toNum(dbUser.artist.lon),
+          lat: this.toNum(dbUser.artist.lat),
+          lon: this.toNum(dbUser.artist.lon),
         }
       : null;
 
@@ -154,22 +167,17 @@ export class AuthController {
     };
   }
 
-  /**
-   * Logout by clearing the JWT cookie
-   */
+  /** Выход — очищаем JWT cookie */
   @Get('logout')
   logout(@Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
     const cookieDomain = this.config.get<string>('COOKIE_DOMAIN') || undefined;
-
     res.clearCookie('accessToken', {
       httpOnly: true,
       sameSite: 'lax',
-      secure: isProd,
+      secure: this.isProd(),
       domain: cookieDomain,
       path: '/',
     });
-
     return res.json({ success: true });
   }
 }

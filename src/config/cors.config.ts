@@ -1,3 +1,4 @@
+// src/config/cors.config.ts
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 
 /**
@@ -30,6 +31,7 @@ export function getCorsOptions(): CorsOptions {
   const isProd = process.env.NODE_ENV === 'production';
   const allowlist = getEffectiveCorsAllowlist();
   const vercelWildcard = /\.vercel\.app$/i;
+  const allowAll = process.env.ALLOW_ALL_CORS === '1';
 
   return {
     origin: (origin, callback) => {
@@ -40,20 +42,27 @@ export function getCorsOptions(): CorsOptions {
       try {
         hostname = new URL(origin).hostname;
       } catch {
-        return callback(new Error('CORS: invalid Origin'), false);
+        // Do not throw — just disable CORS for invalid origin to avoid 500s
+        return callback(null, false);
       }
 
+      const isAllowedHostname =
+        hostname === 'tattmap.com' ||
+        hostname === 'www.tattmap.com' ||
+        (isProd && vercelWildcard.test(hostname));
+
       const allowed =
-        allowlist.includes(origin) || (isProd && vercelWildcard.test(hostname));
+        allowAll || allowlist.includes(origin) || isAllowedHostname;
 
       if (allowed) return callback(null, true);
-      return callback(
-        new Error(`CORS: Origin not allowed -> ${origin}`),
-        false,
-      );
+      // Important: don't error out — just respond without CORS headers
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    // Some proxies/preflight clients expect 204 instead of default 204/204 fallback
+    // Note: this property is supported by the underlying CORS middleware
+    optionsSuccessStatus: 204,
   };
 }

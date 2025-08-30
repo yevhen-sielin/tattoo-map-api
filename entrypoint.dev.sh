@@ -29,9 +29,11 @@ fi
 log "prisma generate"
 pnpm prisma generate
 
-# Apply migrations; if there are none – fall back to db push (dev only)
-log "prisma migrate deploy (or db push)"
-pnpm prisma migrate deploy || pnpm prisma db push
+# Apply migrations if present, then always ensure schema is in sync (dev only)
+log "prisma migrate deploy"
+pnpm prisma migrate deploy || true
+log "prisma db push (ensure dev schema sync)"
+pnpm prisma db push
 
 # Start Nest in dev mode
 log "start:dev"

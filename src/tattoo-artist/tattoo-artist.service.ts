@@ -246,12 +246,21 @@ export class TattooArtistService {
       description: string;
       styles: string[];
       instagram: string;
+      beginner?: boolean;
+      coverups?: boolean;
+      color?: boolean;
+      blackAndGray?: boolean;
+      email?: string | null;
+      website?: string | null;
+      tiktok?: string | null;
+      facebook?: string | null;
+      telegram?: string | null;
+      whatsapp?: string | null;
+      wechat?: string | null;
+      snapchat?: string | null;
       photos?: string[];
       lat?: number | null;
       lon?: number | null;
-      beginner?: boolean;
-      color?: boolean;
-      blackAndGray?: boolean;
     },
   ) {
     // Normalize inputs
@@ -269,12 +278,21 @@ export class TattooArtistService {
       description: data.description,
       styles: data.styles,
       instagram: data.instagram,
+      beginner: Boolean(data.beginner),
+      coverups: Boolean(data.coverups),
+      color: Boolean(data.color),
+      blackAndGray: Boolean(data.blackAndGray),
+      email: data.email ?? null,
+      website: data.website ?? null,
+      tiktok: data.tiktok ?? null,
+      facebook: data.facebook ?? null,
+      telegram: data.telegram ?? null,
+      whatsapp: data.whatsapp ?? null,
+      wechat: data.wechat ?? null,
+      snapchat: data.snapchat ?? null,
       photos: Array.isArray(data.photos) ? data.photos : [],
       lat: this.toDec6(data.lat),
       lon: this.toDec6(data.lon),
-      beginner: Boolean(data.beginner),
-      color: Boolean(data.color),
-      blackAndGray: Boolean(data.blackAndGray),
     };
 
     // Ensure avatar is sourced from the User profile on first create

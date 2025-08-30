@@ -39,8 +39,17 @@ model Artist {
   description String
   styles      String[]
   instagram   String
+  email       String?
+  website     String?
+  tiktok      String?
+  facebook    String?
+  telegram    String?
+  whatsapp    String?
+  wechat      String?
+  snapchat    String?
   avatar      String
   beginner    Boolean  @default(false)
+  coverups    Boolean  @default(false)
   color       Boolean  @default(false)
   blackAndGray Boolean @default(false)
   photos      String[] @default([])
