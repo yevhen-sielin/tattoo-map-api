@@ -28,40 +28,62 @@ model User {
 }
 
 model Artist {
-  userId      String   @id
-  user        User     @relation(fields: [userId], references: [id])
+  userId         String   @id
+  user           User     @relation(fields: [userId], references: [id])
 
-  city        String
-  country     String
-  countryCode String?  @db.VarChar(2)
-  address     String
-  nickname    String
-  description String
-  styles      String[]
-  instagram   String
-  email       String?
-  website     String?
-  tiktok      String?
-  facebook    String?
-  telegram    String?
-  whatsapp    String?
-  wechat      String?
-  snapchat    String?
-  avatar      String
-  beginner    Boolean  @default(false)
-  coverups    Boolean  @default(false)
-  color       Boolean  @default(false)
-  blackAndGray Boolean @default(false)
-  photos      String[] @default([])
-  lat         Decimal? @db.Decimal(9, 6)
-  lon         Decimal? @db.Decimal(9, 6)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  // Основные поля
+  city           String
+  country        String
+  countryCode    String?  @db.VarChar(2)
+  address        String
+  nickname       String
+  description    String
+  styles         String[]
+  instagram      String
+  email          String?
+  website        String?
+  tiktok         String?
+  facebook       String?
+  telegram       String?
+  whatsapp       String?
+  wechat         String?
+  snapchat       String?
+  avatar         String
+  beginner       Boolean  @default(false)
+  coverups       Boolean  @default(false)
+  color          Boolean  @default(false)
+  blackAndGray   Boolean  @default(false)
+  photos         String[] @default([])
+  lat            Decimal? @db.Decimal(9, 6)
+  lon            Decimal? @db.Decimal(9, 6)
 
-  likes       Like[]   @relation("ArtistLikes")
+  // Новые поля для фильтров
+  regionName     String?           // "Flevoland"
+  regionCode     String?           // "FL"
+  regionCodeFull String?           // "NL-FL"
+  postcode       String?           // "3894 AC"
+  streetName     String?           // "Wijenburg"
+  addressNumber  String?           // "8"
+
+  // Точка для маршрутизации
+  routableLat    Decimal? @db.Decimal(9, 6)
+  routableLon    Decimal? @db.Decimal(9, 6)
+
+  // Сырой geo-ответ
+  geoRaw         Json?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  likes          Like[]   @relation("ArtistLikes")
 
   @@index([countryCode])
+  @@index([regionCodeFull])
+  @@index([city])
+  @@index([postcode])
   @@index([lat, lon])
+  @@index([nickname])
+  @@index([beginner, color, blackAndGray])
 }
 
 model Like {

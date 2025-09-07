@@ -6,7 +6,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { getCorsOptions, getEffectiveCorsAllowlist } from './config/cors.config';
+import {
+  getCorsOptions,
+  getEffectiveCorsAllowlist,
+} from './config/cors.config';
 
 dotenv.config({ override: process.env.NODE_ENV !== 'production' });
 
@@ -44,7 +47,7 @@ async function bootstrap() {
   });
 
   const port = Number(process.env.PORT ?? 3000);
-  await app.listen(port, '0.0.0.0'); // важно для Docker/ECS
+  await app.listen(port, '0.0.0.0');
 
   const appUrl = await app.getUrl();
   console.log(`[BOOT] NODE_ENV=${process.env.NODE_ENV}  PORT=${port}`);

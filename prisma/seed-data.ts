@@ -16,6 +16,16 @@ export type SeedArtist = {
   photos?: string[];
   lat?: number | null;
   lon?: number | null;
+  // New location fields
+  regionName?: string | null;
+  regionCode?: string | null;
+  regionCodeFull?: string | null;
+  postcode?: string | null;
+  streetName?: string | null;
+  addressNumber?: string | null;
+  routableLat?: number | null;
+  routableLon?: number | null;
+  geoRaw?: any;
 };
 
 export type SeedUser = {
@@ -29,29 +39,29 @@ export type SeedUser = {
 };
 
 const names = [
-  'Eva Noir',
-  'Leo Ink',
-  'Mila Shade',
-  'Noah Veld',
-  'Luna Stark',
-  'Finn Blauw',
-  'Iris Nova',
-  'Max Raven',
-  'Nora Flint',
-  'Zoe Vale',
+  'Eva Noir', 'Leo Ink', 'Mila Shade', 'Noah Veld', 'Luna Stark', 'Finn Blauw', 'Iris Nova', 'Max Raven', 'Nora Flint', 'Zoe Vale',
+  'Alex Stone', 'Bella Moon', 'Casper Ink', 'Diana Rose', 'Erik Steel', 'Freya Wolf', 'Gunnar Frost', 'Hilda Storm', 'Ivan Dark', 'Jade Light',
+  'Kai Shadow', 'Lara Fire', 'Mason River', 'Nina Star', 'Oscar Wind', 'Pia Ocean', 'Quinn Forest', 'Ruby Sky', 'Sage Mountain', 'Tara Dawn',
+  'Ulrich Night', 'Vera Sun', 'Wade Earth', 'Xara Moon', 'Yuki Snow', 'Zara Rain', 'Aria Flame', 'Blake Storm', 'Cora Mist', 'Dexter Wave',
+  'Elena Tide', 'Felix Rock', 'Gia Cloud', 'Hugo Star', 'Ivy Leaf', 'Jasper Stone', 'Kira Wind', 'Liam Fire', 'Maya Earth', 'Nico Sky',
+  'Olive Rain', 'Phoenix Sun', 'Quinn Moon', 'Raven Night', 'Sage Dawn', 'Titan Storm', 'Uma Star', 'Viktor Fire', 'Willow Mist', 'Xander Wave',
+  'Yara Light', 'Zane Dark', 'Aurora Flame', 'Blaze Storm', 'Crystal Ice', 'Drake Fire', 'Ember Moon', 'Frost Star', 'Glacier Wind', 'Haven Rain',
+  'Iris Dawn', 'Jupiter Sun', 'Koda Moon', 'Luna Star', 'Mars Fire', 'Nova Light', 'Orion Dark', 'Polaris Sky', 'Quasar Storm', 'Rigel Wave',
+  'Sirius Sun', 'Titan Moon', 'Ursa Star', 'Vega Light', 'Wolf Storm', 'Xena Fire', 'Yara Moon', 'Zeus Star', 'Alpha Dawn', 'Beta Night',
+  'Gamma Sun', 'Delta Moon', 'Epsilon Star', 'Zeta Light', 'Eta Storm', 'Theta Fire', 'Iota Moon', 'Kappa Star', 'Lambda Dawn', 'Mu Night'
 ];
 
 const nicknames = [
-  'eva.noir',
-  'leo.ink',
-  'mila.shade',
-  'noah.veld',
-  'luna.stark',
-  'finn.blauw',
-  'iris.nova',
-  'max.raven',
-  'nora.flint',
-  'zoe.vale',
+  'eva.noir', 'leo.ink', 'mila.shade', 'noah.veld', 'luna.stark', 'finn.blauw', 'iris.nova', 'max.raven', 'nora.flint', 'zoe.vale',
+  'alex.stone', 'bella.moon', 'casper.ink', 'diana.rose', 'erik.steel', 'freya.wolf', 'gunnar.frost', 'hilda.storm', 'ivan.dark', 'jade.light',
+  'kai.shadow', 'lara.fire', 'mason.river', 'nina.star', 'oscar.wind', 'pia.ocean', 'quinn.forest', 'ruby.sky', 'sage.mountain', 'tara.dawn',
+  'ulrich.night', 'vera.sun', 'wade.earth', 'xara.moon', 'yuki.snow', 'zara.rain', 'aria.flame', 'blake.storm', 'cora.mist', 'dexter.wave',
+  'elena.tide', 'felix.rock', 'gia.cloud', 'hugo.star', 'ivy.leaf', 'jasper.stone', 'kira.wind', 'liam.fire', 'maya.earth', 'nico.sky',
+  'olive.rain', 'phoenix.sun', 'quinn.moon', 'raven.night', 'sage.dawn', 'titan.storm', 'uma.star', 'viktor.fire', 'willow.mist', 'xander.wave',
+  'yara.light', 'zane.dark', 'aurora.flame', 'blaze.storm', 'crystal.ice', 'drake.fire', 'ember.moon', 'frost.star', 'glacier.wind', 'haven.rain',
+  'iris.dawn', 'jupiter.sun', 'koda.moon', 'luna.star', 'mars.fire', 'nova.light', 'orion.dark', 'polaris.sky', 'quasar.storm', 'rigel.wave',
+  'sirius.sun', 'titan.moon', 'ursa.star', 'vega.light', 'wolf.storm', 'xena.fire', 'yara.moon', 'zeus.star', 'alpha.dawn', 'beta.night',
+  'gamma.sun', 'delta.moon', 'epsilon.star', 'zeta.light', 'eta.storm', 'theta.fire', 'iota.moon', 'kappa.star', 'lambda.dawn', 'mu.night'
 ];
 
 const cities = ['Amsterdam', 'Rotterdam', 'Utrecht', 'The Hague', 'Eindhoven'];
@@ -185,5 +195,3 @@ export const defaultSeedUsers: SeedUser[] = [
     },
   },
 ];
-
-

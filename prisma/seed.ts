@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { defaultSeedUsers, makeRandomUsers, type SeedUser } from './seed-data';
+import { makeRandomUsers, type SeedUser } from './seed-data-european';
 
 const prisma = new PrismaClient();
 
@@ -18,7 +18,7 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
       avatar: u.avatar ?? null,
       role: u.role ?? 'USER',
       artist: {
-        create: ({
+        create: {
           nickname: u.artist.nickname,
           city: u.artist.city,
           country: u.artist.country,
@@ -43,7 +43,17 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
           photos: Array.isArray(u.artist.photos) ? u.artist.photos : [],
           lat: toDecimal6(u.artist.lat),
           lon: toDecimal6(u.artist.lon),
-        } as any),
+          // New location fields
+          regionName: u.artist.regionName ?? null,
+          regionCode: u.artist.regionCode ?? null,
+          regionCodeFull: u.artist.regionCodeFull ?? null,
+          postcode: u.artist.postcode ?? null,
+          streetName: u.artist.streetName ?? null,
+          addressNumber: u.artist.addressNumber ?? null,
+          routableLat: toDecimal6(u.artist.routableLat),
+          routableLon: toDecimal6(u.artist.routableLon),
+          geoRaw: u.artist.geoRaw ?? null,
+        } as any,
       },
     },
     update: {
@@ -53,7 +63,7 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
       role: u.role ?? 'USER',
       artist: {
         upsert: {
-          create: ({
+          create: {
             nickname: u.artist.nickname,
             city: u.artist.city,
             country: u.artist.country,
@@ -78,8 +88,18 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
             photos: Array.isArray(u.artist.photos) ? u.artist.photos : [],
             lat: toDecimal6(u.artist.lat),
             lon: toDecimal6(u.artist.lon),
-          } as any),
-          update: ({
+            // New location fields
+            regionName: u.artist.regionName ?? null,
+            regionCode: u.artist.regionCode ?? null,
+            regionCodeFull: u.artist.regionCodeFull ?? null,
+            postcode: u.artist.postcode ?? null,
+            streetName: u.artist.streetName ?? null,
+            addressNumber: u.artist.addressNumber ?? null,
+            routableLat: toDecimal6(u.artist.routableLat),
+            routableLon: toDecimal6(u.artist.routableLon),
+            geoRaw: u.artist.geoRaw ?? null,
+          } as any,
+          update: {
             nickname: u.artist.nickname,
             city: u.artist.city,
             country: u.artist.country,
@@ -104,7 +124,17 @@ async function upsertUserWithArtist(tx: PrismaClient, u: SeedUser) {
             photos: Array.isArray(u.artist.photos) ? u.artist.photos : [],
             lat: toDecimal6(u.artist.lat),
             lon: toDecimal6(u.artist.lon),
-          } as any),
+            // New location fields
+            regionName: u.artist.regionName ?? null,
+            regionCode: u.artist.regionCode ?? null,
+            regionCodeFull: u.artist.regionCodeFull ?? null,
+            postcode: u.artist.postcode ?? null,
+            streetName: u.artist.streetName ?? null,
+            addressNumber: u.artist.addressNumber ?? null,
+            routableLat: toDecimal6(u.artist.routableLat),
+            routableLon: toDecimal6(u.artist.routableLon),
+            geoRaw: u.artist.geoRaw ?? null,
+          } as any,
         },
       },
     },
@@ -118,11 +148,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const COUNT = Number(process.env.SEED_COUNT ?? 8);
-  const users: SeedUser[] = [
-    ...defaultSeedUsers,
-    ...makeRandomUsers(COUNT),
-  ];
+  const COUNT = Number(process.env.SEED_COUNT ?? 100);
+  const users: SeedUser[] = makeRandomUsers(COUNT);
 
   console.info(`Seeding ${users.length} users/artists...`);
   const createdUserIds: string[] = [];
@@ -135,11 +162,16 @@ async function main(): Promise<void> {
 
   // Create some initial likes to showcase the UI
   try {
-    const artistIds = (await prisma.artist.findMany({ select: { userId: true } })).map((a) => a.userId);
+    const artistIds = (
+      await prisma.artist.findMany({ select: { userId: true } })
+    ).map((a) => a.userId);
     const pairs = new Set<string>();
     const likesData: { userId: string; artistId: string }[] = [];
     for (const uid of createdUserIds) {
-      const sampleCount = Math.max(1, Math.min(3, Math.floor(Math.random() * 4))); // 1..3 likes per user
+      const sampleCount = Math.max(
+        1,
+        Math.min(3, Math.floor(Math.random() * 4)),
+      ); // 1..3 likes per user
       const shuffled = [...artistIds].sort(() => Math.random() - 0.5);
       let added = 0;
       for (const aid of shuffled) {
@@ -169,5 +201,5 @@ main()
     process.exit(1);
   })
   .finally(() => {
-    prisma.$disconnect();
+    void prisma.$disconnect();
   });

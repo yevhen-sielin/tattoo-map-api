@@ -1,5 +1,13 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsBooleanString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBooleanString,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class SearchArtistsDto {
   // Bounding box: west,south,east,north (lon,lat,lon,lat)
@@ -47,6 +55,14 @@ export class SearchArtistsDto {
 
   @IsOptional()
   @IsString()
+  regionCode?: string; // region code
+
+  @IsOptional()
+  @IsString()
+  city?: string; // city name
+
+  @IsOptional()
+  @IsString()
   q?: string; // search by nickname/city
 
   // Work type flags
@@ -62,6 +78,28 @@ export class SearchArtistsDto {
   @IsBooleanString()
   blackAndGray?: string;
 
+  // Radius search
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  centerLat?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  centerLon?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))
+  @IsNumber()
+  @Min(0.1)
+  @Max(1000)
+  radiusKm?: number;
+
   @IsOptional()
   @Transform(({ value }) => (value !== undefined ? Number(value) : 500))
   @IsInt()
@@ -70,7 +108,9 @@ export class SearchArtistsDto {
   limit?: number = 500;
 }
 
-export function parseBbox(dto: SearchArtistsDto): { west: number; south: number; east: number; north: number } | null {
+export function parseBbox(
+  dto: SearchArtistsDto,
+): { west: number; south: number; east: number; north: number } | null {
   if (dto.bbox) {
     const parts = dto.bbox.split(',').map((v) => Number(v.trim()));
     if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
@@ -79,10 +119,17 @@ export function parseBbox(dto: SearchArtistsDto): { west: number; south: number;
     }
   }
   if (
-    dto.west !== undefined && dto.south !== undefined && dto.east !== undefined && dto.north !== undefined
+    dto.west !== undefined &&
+    dto.south !== undefined &&
+    dto.east !== undefined &&
+    dto.north !== undefined
   ) {
-    return { west: dto.west, south: dto.south, east: dto.east, north: dto.north };
+    return {
+      west: dto.west,
+      south: dto.south,
+      east: dto.east,
+      north: dto.north,
+    };
   }
   return null;
 }
-

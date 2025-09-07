@@ -1,5 +1,9 @@
 // tattoo-artist.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -9,10 +13,15 @@ type SearchParams = {
   bbox: BBox | null;
   styles: string[];
   countryCode: string | null;
+  regionCode: string | null;
+  city: string | null;
   q: string | null;
   beginner?: boolean;
   color?: boolean;
   blackAndGray?: boolean;
+  centerLat: number | null;
+  centerLon: number | null;
+  radiusKm: number | null;
   limit: number;
   // optional future-proofing
   skip?: number;
@@ -28,7 +37,11 @@ export class TattooArtistService {
   private decToNum(v: Prisma.Decimal | null): number | null {
     // Prisma.Decimal has toNumber(); keep a safe guard
     // @ts-ignore
-    return v == null ? null : typeof v.toNumber === 'function' ? v.toNumber() : Number(v);
+    return v == null
+      ? null
+      : typeof v.toNumber === 'function'
+        ? v.toNumber()
+        : Number(v);
   }
 
   /** Normalize DB entity into transport-safe DTO (no Decimal leaks) */
@@ -78,25 +91,58 @@ export class TattooArtistService {
         ? params.countryCode.trim().toUpperCase()
         : null;
 
+    // Determine search type for logging/debugging
+    const searchType = this.determineSearchType(params);
+    console.log(`🔍 Search type: ${searchType}`, {
+      countryCode: cc,
+      regionCode: params.regionCode,
+      city: params.city,
+      hasRadius: !!(params.centerLat && params.centerLon && params.radiusKm),
+      hasBbox: !!params.bbox,
+    });
+
     const where: Prisma.ArtistWhereInput = {};
     const AND: Prisma.ArtistWhereInput[] = [];
     const OR: Prisma.ArtistWhereInput[] = [];
     const NOT: Prisma.ArtistWhereInput[] = [];
 
+    // Location-based filters (hierarchical: country -> region -> city)
     if (cc) {
-      // case-insensitive equality without changing existing rows
-      AND.push({ countryCode: { in: [cc, cc.toLowerCase()] } as any });
+      // Filter by country code (ISO-3166-1 alpha-2)
+      AND.push({ countryCode: { in: [cc, cc.toLowerCase()] } });
+    }
+
+    if (params.regionCode?.trim()) {
+      // Filter by region code (e.g., "FL" for Flevoland)
+      const regionCode = params.regionCode.trim();
+      AND.push({
+        regionCodeFull: { contains: regionCode, mode: 'insensitive' },
+      });
+    }
+
+    if (params.city?.trim()) {
+      // Filter by city name (most specific location filter)
+      const city = params.city.trim();
+      AND.push({ city: { contains: city, mode: 'insensitive' } });
     }
 
     if (params.styles?.length) {
-      const toTitle = (s: string) => s
-        .toLowerCase()
-        .split(/\s+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-      const styleVariants = Array.from(new Set(
-        params.styles.flatMap((s) => [s, s.toLowerCase(), s.toUpperCase(), toTitle(s)])
-      ));
+      const toTitle = (s: string) =>
+        s
+          .toLowerCase()
+          .split(/\s+/)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ');
+      const styleVariants = Array.from(
+        new Set(
+          params.styles.flatMap((s) => [
+            s,
+            s.toLowerCase(),
+            s.toUpperCase(),
+            toTitle(s),
+          ]),
+        ),
+      );
       AND.push({ styles: { hasSome: styleVariants } });
     }
 
@@ -122,7 +168,7 @@ export class TattooArtistService {
       AND.push({ blackAndGray: true } as any);
     }
 
-    // Bounding box:
+    // Bounding box or radius search:
     // - Regular case (west <= east): single range on lon.
     // - Antimeridian (east < west): lon in [west, 180] OR lon in [-180, east].
     const bbox = params.bbox;
@@ -133,7 +179,45 @@ export class TattooArtistService {
 
     let needsClientSideFilter = false;
 
-    if (bbox) {
+    // Handle radius search
+    if (
+      params.centerLat != null &&
+      params.centerLon != null &&
+      params.radiusKm != null
+    ) {
+      // Convert radius to bbox for initial DB filtering
+      const { west, south, east, north } = this.radiusToBbox(
+        params.centerLat,
+        params.centerLon,
+        params.radiusKm,
+      );
+
+      AND.push(withLatLonNotNull);
+      AND.push({
+        lat: {
+          gte: this.toDec6(south)!,
+          lte: this.toDec6(north)!,
+        },
+      });
+
+      if (east >= west) {
+        AND.push({
+          lon: {
+            gte: this.toDec6(west)!,
+            lte: this.toDec6(east)!,
+          },
+        });
+      } else {
+        AND.push({
+          OR: [
+            { lon: { gte: this.toDec6(west)! } },
+            { lon: { lte: this.toDec6(east)! } },
+          ],
+        });
+      }
+      // Always need client-side filtering for accurate radius
+      needsClientSideFilter = true;
+    } else if (bbox) {
       const { west, south, east, north } = bbox;
 
       // Always bound latitude in DB
@@ -161,7 +245,7 @@ export class TattooArtistService {
             { lon: { lte: this.toDec6(east)! } }, // -180 .. east
           ],
         });
-        // We’ll still run a final client-side filter to be extra safe
+        // We'll still run a final client-side filter to be extra safe
         needsClientSideFilter = true;
       }
     }
@@ -179,23 +263,51 @@ export class TattooArtistService {
 
     const normalized = artists.map((a) => this.mapArtist(a));
 
-    if (bbox && needsClientSideFilter) {
-      const { west, south, east, north } = bbox;
-      return normalized.filter((a) => {
-        if (a.lat == null || a.lon == null) return false;
-        const inLat = a.lat >= south && a.lat <= north;
-        const inLon =
-          east >= west
-            ? a.lon >= west && a.lon <= east
-            : a.lon >= west || a.lon <= east; // wrap-around
-        return inLat && inLon;
-      });
+    if (needsClientSideFilter) {
+      if (
+        params.centerLat != null &&
+        params.centerLon != null &&
+        params.radiusKm != null
+      ) {
+        // Radius-based filtering
+        return normalized.filter((a) => {
+          if (a.lat == null || a.lon == null) return false;
+          const distance = this.calculateDistance(
+            params.centerLat!,
+            params.centerLon!,
+            a.lat,
+            a.lon,
+          );
+          return distance <= params.radiusKm!;
+        });
+      } else if (bbox) {
+        // Bbox-based filtering
+        const { west, south, east, north } = bbox;
+        return normalized.filter((a) => {
+          if (a.lat == null || a.lon == null) return false;
+          const inLat = a.lat >= south && a.lat <= north;
+          const inLon =
+            east >= west
+              ? a.lon >= west && a.lon <= east
+              : a.lon >= west || a.lon <= east; // wrap-around
+          return inLat && inLon;
+        });
+      }
     }
 
     // attach likes counts
-    const counts = await this.prisma.like.groupBy({ by: ['artistId'], _count: { artistId: true }, where: { artistId: { in: normalized.map(a => a.userId) } } });
-    const mapCount = new Map(counts.map(c => [c.artistId, c._count.artistId]));
-    return normalized.map(a => ({ ...a, likes: mapCount.get(a.userId) ?? 0 }));
+    const counts = await this.prisma.like.groupBy({
+      by: ['artistId'],
+      _count: { artistId: true },
+      where: { artistId: { in: normalized.map((a) => a.userId) } },
+    });
+    const mapCount = new Map(
+      counts.map((c) => [c.artistId, c._count.artistId]),
+    );
+    return normalized.map((a) => ({
+      ...a,
+      likes: mapCount.get(a.userId) ?? 0,
+    }));
   }
 
   async likeArtist(userId: string, artistId: string) {
@@ -209,7 +321,9 @@ export class TattooArtistService {
       this.prisma.artist.findUnique({ where: { userId: artistId } }),
     ]);
     if (!user) {
-      throw new NotFoundException('User not found. Please authenticate to create a like.');
+      throw new NotFoundException(
+        'User not found. Please authenticate to create a like.',
+      );
     }
     if (!artist) {
       throw new NotFoundException('Artist not found');
@@ -225,13 +339,17 @@ export class TattooArtistService {
   }
 
   async unlikeArtist(userId: string, artistId: string) {
-    await this.prisma.like.delete({ where: { userId_artistId: { userId, artistId } } }).catch(() => {});
+    await this.prisma.like
+      .delete({ where: { userId_artistId: { userId, artistId } } })
+      .catch(() => {});
     const count = await this.prisma.like.count({ where: { artistId } });
     return { artistId, likes: count };
   }
 
   async isLikedBy(userId: string, artistId: string) {
-    const like = await this.prisma.like.findUnique({ where: { userId_artistId: { userId, artistId } } });
+    const like = await this.prisma.like.findUnique({
+      where: { userId_artistId: { userId, artistId } },
+    });
     return { artistId, liked: Boolean(like) };
   }
 
@@ -261,6 +379,16 @@ export class TattooArtistService {
       photos?: string[];
       lat?: number | null;
       lon?: number | null;
+      // New location fields
+      regionName?: string | null;
+      regionCode?: string | null;
+      regionCodeFull?: string | null;
+      postcode?: string | null;
+      streetName?: string | null;
+      addressNumber?: string | null;
+      routableLat?: number | null;
+      routableLon?: number | null;
+      geoRaw?: any;
     },
   ) {
     // Normalize inputs
@@ -293,6 +421,16 @@ export class TattooArtistService {
       photos: Array.isArray(data.photos) ? data.photos : [],
       lat: this.toDec6(data.lat),
       lon: this.toDec6(data.lon),
+      // New location fields
+      regionName: data.regionName ?? null,
+      regionCode: data.regionCode ?? null,
+      regionCodeFull: data.regionCodeFull ?? null,
+      postcode: data.postcode ?? null,
+      streetName: data.streetName ?? null,
+      addressNumber: data.addressNumber ?? null,
+      routableLat: this.toDec6(data.routableLat),
+      routableLon: this.toDec6(data.routableLon),
+      geoRaw: data.geoRaw ?? null,
     };
 
     // Ensure avatar is sourced from the User profile on first create
@@ -303,5 +441,63 @@ export class TattooArtistService {
       update: payload, // do not change avatar on update via this endpoint
       create: { userId, ...payload, avatar: user?.avatar ?? '' },
     });
+  }
+
+  // Helper method to convert radius to bounding box
+  private radiusToBbox(lat: number, lon: number, radiusKm: number): BBox {
+    const dLat = radiusKm / 111; // Approximate km per degree latitude
+    const cosLat = Math.cos((lat * Math.PI) / 180) || 1e-6;
+    const dLon = radiusKm / (111 * cosLat); // Approximate km per degree longitude at this latitude
+
+    return {
+      west: lon - dLon,
+      south: lat - dLat,
+      east: lon + dLon,
+      north: lat + dLat,
+    };
+  }
+
+  // Helper method to calculate distance between two points using Haversine formula
+  private calculateDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLon = this.toRadians(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) *
+        Math.cos(this.toRadians(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRadians(degrees: number): number {
+    return degrees * (Math.PI / 180);
+  }
+
+  // Determine search type based on provided parameters
+  private determineSearchType(params: SearchParams): string {
+    if (params.centerLat && params.centerLon && params.radiusKm) {
+      return 'radius';
+    }
+    if (params.bbox) {
+      return 'bbox';
+    }
+    if (params.city) {
+      return 'city';
+    }
+    if (params.regionCode) {
+      return 'region';
+    }
+    if (params.countryCode) {
+      return 'country';
+    }
+    return 'global';
   }
 }

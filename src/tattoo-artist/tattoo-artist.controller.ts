@@ -31,10 +31,15 @@ export class TattooArtistController {
       bbox,
       styles,
       countryCode: query.countryCode ? query.countryCode.trim() : null,
+      regionCode: query.regionCode ? query.regionCode.trim() : null,
+      city: query.city ? query.city.trim() : null,
       q: query.q ?? null,
       beginner: query.beginner === 'true',
       color: query.color === 'true',
       blackAndGray: query.blackAndGray === 'true',
+      centerLat: query.centerLat ?? null,
+      centerLon: query.centerLon ?? null,
+      radiusKm: query.radiusKm ?? null,
       limit: query.limit ?? 500,
     });
   }
@@ -72,6 +77,16 @@ export class TattooArtistController {
       photos?: string[];
       lat?: number | null;
       lon?: number | null;
+      // New location fields
+      regionName?: string | null;
+      regionCode?: string | null;
+      regionCodeFull?: string | null;
+      postcode?: string | null;
+      streetName?: string | null;
+      addressNumber?: string | null;
+      routableLat?: number | null;
+      routableLon?: number | null;
+      geoRaw?: any;
     },
     @CurrentUser() user: JwtUser,
   ) {
