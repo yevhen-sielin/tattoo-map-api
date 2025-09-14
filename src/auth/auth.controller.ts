@@ -124,6 +124,7 @@ export class AuthController {
             photos: true,
             lat: true,
             lon: true,
+            geoRaw: true,
           },
         },
       },
@@ -155,6 +156,7 @@ export class AuthController {
           photos: dbUser.artist.photos,
           lat: this.toNum(dbUser.artist.lat),
           lon: this.toNum(dbUser.artist.lon),
+          geoRaw: dbUser.artist.geoRaw,
         }
       : null;
 

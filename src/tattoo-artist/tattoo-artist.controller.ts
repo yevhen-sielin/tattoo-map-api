@@ -37,6 +37,7 @@ export class TattooArtistController {
       beginner: query.beginner === 'true',
       color: query.color === 'true',
       blackAndGray: query.blackAndGray === 'true',
+      coverups: query.coverups === 'true',
       centerLat: query.centerLat ?? null,
       centerLon: query.centerLon ?? null,
       radiusKm: query.radiusKm ?? null,
@@ -77,7 +78,6 @@ export class TattooArtistController {
       photos?: string[];
       lat?: number | null;
       lon?: number | null;
-      // New location fields
       regionName?: string | null;
       regionCode?: string | null;
       regionCodeFull?: string | null;

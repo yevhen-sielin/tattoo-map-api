@@ -78,6 +78,11 @@ export class SearchArtistsDto {
   @IsBooleanString()
   blackAndGray?: string;
 
+  // Cover-up work flag
+  @IsOptional()
+  @IsBooleanString()
+  coverups?: string;
+
   // Radius search
   @IsOptional()
   @Transform(({ value }) => (value !== undefined ? Number(value) : undefined))

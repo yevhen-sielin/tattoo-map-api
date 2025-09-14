@@ -19,6 +19,7 @@ type SearchParams = {
   beginner?: boolean;
   color?: boolean;
   blackAndGray?: boolean;
+  coverups?: boolean;
   centerLat: number | null;
   centerLon: number | null;
   radiusKm: number | null;
@@ -36,7 +37,6 @@ export class TattooArtistService {
   /** Convert Prisma.Decimal | null to number | null */
   private decToNum(v: Prisma.Decimal | null): number | null {
     // Prisma.Decimal has toNumber(); keep a safe guard
-    // @ts-ignore
     return v == null
       ? null
       : typeof v.toNumber === 'function'
@@ -166,6 +166,10 @@ export class TattooArtistService {
 
     if (params.blackAndGray === true) {
       AND.push({ blackAndGray: true } as any);
+    }
+
+    if (params.coverups === true) {
+      AND.push({ coverups: true } as any);
     }
 
     // Bounding box or radius search:
@@ -379,7 +383,6 @@ export class TattooArtistService {
       photos?: string[];
       lat?: number | null;
       lon?: number | null;
-      // New location fields
       regionName?: string | null;
       regionCode?: string | null;
       regionCodeFull?: string | null;
@@ -421,7 +424,6 @@ export class TattooArtistService {
       photos: Array.isArray(data.photos) ? data.photos : [],
       lat: this.toDec6(data.lat),
       lon: this.toDec6(data.lon),
-      // New location fields
       regionName: data.regionName ?? null,
       regionCode: data.regionCode ?? null,
       regionCodeFull: data.regionCodeFull ?? null,

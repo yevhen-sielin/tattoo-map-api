@@ -31,7 +31,6 @@ model Artist {
   userId         String   @id
   user           User     @relation(fields: [userId], references: [id])
 
-  // Основные поля
   city           String
   country        String
   countryCode    String?  @db.VarChar(2)
@@ -57,7 +56,6 @@ model Artist {
   lat            Decimal? @db.Decimal(9, 6)
   lon            Decimal? @db.Decimal(9, 6)
 
-  // Новые поля для фильтров
   regionName     String?           // "Flevoland"
   regionCode     String?           // "FL"
   regionCodeFull String?           // "NL-FL"
@@ -65,11 +63,9 @@ model Artist {
   streetName     String?           // "Wijenburg"
   addressNumber  String?           // "8"
 
-  // Точка для маршрутизации
   routableLat    Decimal? @db.Decimal(9, 6)
   routableLon    Decimal? @db.Decimal(9, 6)
 
-  // Сырой geo-ответ
   geoRaw         Json?
 
   createdAt      DateTime @default(now())
