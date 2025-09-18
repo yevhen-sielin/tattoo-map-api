@@ -93,6 +93,12 @@ export class TattooArtistController {
     return this.tattooArtistService.upsertForCurrentUser(user.sub, body);
   }
 
+  @Delete()
+  @UseGuards(JwtAuthGuard)
+  async deleteMine(@CurrentUser() user: JwtUser) {
+    return this.tattooArtistService.deleteForCurrentUser(user.sub);
+  }
+
   @Post(':id/like')
   @UseGuards(JwtAuthGuard)
   async like(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {

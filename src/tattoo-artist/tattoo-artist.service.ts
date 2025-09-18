@@ -445,6 +445,14 @@ export class TattooArtistService {
     });
   }
 
+  async deleteForCurrentUser(userId: string) {
+    await this.prisma.$transaction([
+      this.prisma.like.deleteMany({ where: { artistId: userId } }),
+      this.prisma.artist.deleteMany({ where: { userId } }),
+    ]);
+    return { success: true };
+  }
+
   // Helper method to convert radius to bounding box
   private radiusToBbox(lat: number, lon: number, radiusKm: number): BBox {
     const dLat = radiusKm / 111; // Approximate km per degree latitude
