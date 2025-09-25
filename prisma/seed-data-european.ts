@@ -1466,3 +1466,78 @@ export function makeRandomUsers(count: number): SeedUser[] {
 }
 
 export const defaultSeedUsers: SeedUser[] = [];
+
+export function makeFixedAddressUsers(
+  count: number,
+  opts: {
+    city: string;
+    country: string;
+    countryCode?: string | null;
+    regionName?: string | null;
+    regionCode?: string | null;
+    regionCodeFull?: string | null;
+    postcode?: string | null;
+    streetName?: string | null;
+    addressNumber?: string | null;
+    lat: number;
+    lon: number;
+    addressFull?: string | null;
+    stylesFixed?: string[] | null;
+  },
+): SeedUser[] {
+  const users: SeedUser[] = [];
+  for (let i = 0; i < count; i++) {
+    const name = names[i % names.length];
+    const handle = nicknames[i % nicknames.length];
+    const emailLocal = `zeewolde_${i + 1}_${handle}`.replace(/\./g, '_');
+    const email = `${emailLocal}@example.com`;
+    const googleId = `fixed-zeewolde-${i + 1}`;
+    const avatar = `https://i.pravatar.cc/300?img=${((i + 10) % 70) + 1}`;
+    const styles =
+      Array.isArray(opts.stylesFixed) && opts.stylesFixed.length
+        ? opts.stylesFixed
+        : pickStyles();
+    const address =
+      opts.addressFull ??
+      `${opts.streetName ?? 'Westergo'} ${opts.addressNumber ?? '94'}, ${opts.postcode ?? ''} ${opts.city}, ${opts.country}`.trim();
+
+    users.push({
+      id: `fixed-zeewolde-user-${i + 1}`,
+      email,
+      googleId,
+      name,
+      avatar,
+      role: 'USER',
+      artist: {
+        nickname: `zeewolde.${i + 1}`,
+        city: opts.city,
+        country: opts.country,
+        countryCode: opts.countryCode ?? 'NL',
+        address,
+        description: `Tattoo artist based at ${address}, ${opts.city}.`,
+        styles,
+        instagram: `https://instagram.com/zeewolde_${i + 1}`,
+        avatar,
+        beginner: false,
+        blackAndGray: Math.random() < 0.5,
+        color: true,
+        lat: opts.lat,
+        lon: opts.lon,
+        regionName: opts.regionName ?? 'Flevoland',
+        regionCode: opts.regionCode ?? 'FL',
+        regionCodeFull: opts.regionCodeFull ?? 'NL-FL',
+        postcode: opts.postcode ?? '3891 BX',
+        streetName: opts.streetName ?? 'Westergo',
+        addressNumber: opts.addressNumber ?? '94',
+        routableLat: opts.lat,
+        routableLon: opts.lon,
+        geoRaw: {
+          feature_type: 'address',
+          full_address: address,
+          coordinates: { lat: opts.lat, lon: opts.lon },
+        },
+      },
+    });
+  }
+  return users;
+}

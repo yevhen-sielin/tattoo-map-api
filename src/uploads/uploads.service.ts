@@ -1,35 +1,99 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient } from '@supabase/supabase-js';
+import {
+  S3Client,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+  S3ClientConfig,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+type RequiredEnv = 'AWS_REGION' | 'S3_BUCKET' | 'CDN_BASE_URL';
 
 @Injectable()
 export class UploadsService {
-  private readonly supabase;
-  private readonly bucketName: string;
+  private readonly s3: S3Client;
+  private readonly bucket: string;
+  private readonly cdnBaseUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    const url = this.config.get<string>('SUPABASE_URL');
-    const key = this.config.get<string>('SUPABASE_SERVICE_KEY');
-    this.bucketName = this.config.get<string>('SUPABASE_BUCKET') || 'artists';
-    if (!url || !key) {
-      throw new Error('Supabase storage is not configured');
+    const req = (k: RequiredEnv): string => {
+      const v = this.config.get<string>(k);
+      if (!v) throw new Error(`Missing env ${k}`);
+      return v;
+    };
+
+    this.bucket = req('S3_BUCKET');
+    this.cdnBaseUrl = req('CDN_BASE_URL');
+
+    const region = req('AWS_REGION');
+    const accessKeyId = this.config.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.config.get<string>('AWS_SECRET_ACCESS_KEY');
+
+    const cfg: S3ClientConfig = { region };
+    if (accessKeyId && secretAccessKey) {
+      cfg.credentials = { accessKeyId, secretAccessKey };
     }
-    this.supabase = createClient(url, key, { auth: { persistSession: false } });
+
+    this.s3 = new S3Client(cfg);
   }
 
-  async createSignedUploadUrl(path: string, contentType: string) {
-    // Use upload signed URL API
-    const { data, error } = await this.supabase.storage
-      .from(this.bucketName)
-      .createSignedUploadUrl(path, { contentType, upsert: true });
-    if (error) throw error;
-    return data; // { signedUrl, path, token }
+  /**
+   * Create a signed upload URL for a user's original image.
+   */
+  async createSignedUploadUrl(
+    userId: string,
+    fileName: string,
+    contentType: string,
+  ): Promise<{ signedUrl: string; publicUrl: string; key: string }> {
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const key = `${userId}/originals/${Date.now()}_${safeName}`;
+
+    const putParams = {
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+    };
+
+    return {
+      signedUrl: await getSignedUrl(this.s3, new PutObjectCommand(putParams), {
+        expiresIn: 900,
+      }),
+      publicUrl: `${this.cdnBaseUrl}/${key}`,
+      key,
+    };
   }
 
-  getPublicUrl(path: string) {
-    const { data } = this.supabase.storage.from(this.bucketName).getPublicUrl(path);
-    return data.publicUrl;
+  /**
+   * Delete all S3 objects under a user's folder prefix (both originals/ and optimized/).
+   */
+  async deleteAllForUser(userId: string): Promise<void> {
+    const prefix = `${userId}/`;
+    let continuationToken: string | undefined;
+
+    do {
+      const list = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      const keys = (list.Contents ?? []).map((o) => o.Key!).filter(Boolean);
+      if (keys.length) {
+        await this.s3.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+          }),
+        );
+      }
+
+      continuationToken = list.IsTruncated
+        ? list.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
   }
 }
-
-

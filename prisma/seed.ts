@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { makeRandomUsers, type SeedUser } from './seed-data-european';
+import { makeRandomUsers, makeFixedAddressUsers, type SeedUser } from './seed-data-european';
 
 const prisma = new PrismaClient();
 
@@ -149,7 +149,26 @@ async function main(): Promise<void> {
   }
 
   const COUNT = Number(process.env.SEED_COUNT ?? 100);
-  const users: SeedUser[] = makeRandomUsers(COUNT);
+  const users: SeedUser[] = [
+    ...makeRandomUsers(COUNT),
+    // Extra 10 artists at a fixed address in Zeewolde for overlap testing
+    ...makeFixedAddressUsers(10, {
+      city: 'Zeewolde',
+      country: 'Netherlands',
+      countryCode: 'NL',
+      regionName: 'Flevoland',
+      regionCode: 'FL',
+      regionCodeFull: 'NL-FL',
+      postcode: '3891 BX',
+      streetName: 'Westergo',
+      addressNumber: '94',
+      // Coords from Mapbox payload (routable)
+      lat: 52.335092,
+      lon: 5.53623,
+      addressFull: 'Westergo 94, 3891 BX Zeewolde, Netherlands',
+      stylesFixed: ['Realism', 'Portraits', 'Blackwork'],
+    }),
+  ];
 
   console.info(`Seeding ${users.length} users/artists...`);
   const createdUserIds: string[] = [];

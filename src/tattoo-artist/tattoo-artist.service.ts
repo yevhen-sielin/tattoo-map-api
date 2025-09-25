@@ -5,12 +5,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { Prisma } from '@prisma/client';
 
-type BBox = { west: number; south: number; east: number; north: number };
-
 type SearchParams = {
-  bbox: BBox | null;
   styles: string[];
   countryCode: string | null;
   regionCode: string | null;
@@ -30,7 +28,10 @@ type SearchParams = {
 
 @Injectable()
 export class TattooArtistService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploads: UploadsService,
+  ) {}
 
   // --- helpers --------------------------------------------------------------
 
@@ -59,7 +60,7 @@ export class TattooArtistService {
   }
 
   /** Clamp limit to a safe range */
-  private clampLimit(n: number | undefined, min = 1, max = 100): number {
+  private clampLimit(n: number | undefined, min = 1, max = 2000): number {
     const v = Number.isFinite(n as number) ? (n as number) : 20;
     return Math.max(min, Math.min(max, v));
   }
@@ -98,7 +99,6 @@ export class TattooArtistService {
       regionCode: params.regionCode,
       city: params.city,
       hasRadius: !!(params.centerLat && params.centerLon && params.radiusKm),
-      hasBbox: !!params.bbox,
     });
 
     const where: Prisma.ArtistWhereInput = {};
@@ -172,10 +172,7 @@ export class TattooArtistService {
       AND.push({ coverups: true } as any);
     }
 
-    // Bounding box or radius search:
-    // - Regular case (west <= east): single range on lon.
-    // - Antimeridian (east < west): lon in [west, 180] OR lon in [-180, east].
-    const bbox = params.bbox;
+    // Radius search
     const withLatLonNotNull: Prisma.ArtistWhereInput = {
       lat: { not: null },
       lon: { not: null },
@@ -221,37 +218,6 @@ export class TattooArtistService {
       }
       // Always need client-side filtering for accurate radius
       needsClientSideFilter = true;
-    } else if (bbox) {
-      const { west, south, east, north } = bbox;
-
-      // Always bound latitude in DB
-      AND.push(withLatLonNotNull);
-      AND.push({
-        lat: {
-          gte: this.toDec6(south)!, // safe due to not null above
-          lte: this.toDec6(north)!,
-        },
-      });
-
-      if (east >= west) {
-        // Normal: one interval on lon
-        AND.push({
-          lon: {
-            gte: this.toDec6(west)!,
-            lte: this.toDec6(east)!,
-          },
-        });
-      } else {
-        // Antimeridian split — emulate with OR for lon
-        AND.push({
-          OR: [
-            { lon: { gte: this.toDec6(west)! } }, // west .. +180
-            { lon: { lte: this.toDec6(east)! } }, // -180 .. east
-          ],
-        });
-        // We'll still run a final client-side filter to be extra safe
-        needsClientSideFilter = true;
-      }
     }
 
     if (AND.length) where.AND = AND;
@@ -284,18 +250,6 @@ export class TattooArtistService {
           );
           return distance <= params.radiusKm!;
         });
-      } else if (bbox) {
-        // Bbox-based filtering
-        const { west, south, east, north } = bbox;
-        return normalized.filter((a) => {
-          if (a.lat == null || a.lon == null) return false;
-          const inLat = a.lat >= south && a.lat <= north;
-          const inLon =
-            east >= west
-              ? a.lon >= west && a.lon <= east
-              : a.lon >= west || a.lon <= east; // wrap-around
-          return inLat && inLon;
-        });
       }
     }
 
@@ -311,6 +265,19 @@ export class TattooArtistService {
     return normalized.map((a) => ({
       ...a,
       likes: mapCount.get(a.userId) ?? 0,
+    }));
+  }
+
+  async topByLikes(limit?: number) {
+    const take = this.clampLimit(limit ?? 100);
+    const artists = await this.prisma.artist.findMany({
+      take,
+      orderBy: { likes: { _count: 'desc' } },
+      include: { _count: { select: { likes: true } } },
+    });
+    return artists.map((a) => ({
+      ...this.mapArtist(a),
+      likes: (a as any)._count?.likes ?? 0,
     }));
   }
 
@@ -450,11 +417,13 @@ export class TattooArtistService {
       this.prisma.like.deleteMany({ where: { artistId: userId } }),
       this.prisma.artist.deleteMany({ where: { userId } }),
     ]);
+    // Ensure the entire S3 folder is deleted for this user
+    await this.uploads.deleteAllForUser(userId);
     return { success: true };
   }
 
   // Helper method to convert radius to bounding box
-  private radiusToBbox(lat: number, lon: number, radiusKm: number): BBox {
+  private radiusToBbox(lat: number, lon: number, radiusKm: number) {
     const dLat = radiusKm / 111; // Approximate km per degree latitude
     const cosLat = Math.cos((lat * Math.PI) / 180) || 1e-6;
     const dLon = radiusKm / (111 * cosLat); // Approximate km per degree longitude at this latitude
@@ -495,9 +464,6 @@ export class TattooArtistService {
   private determineSearchType(params: SearchParams): string {
     if (params.centerLat && params.centerLon && params.radiusKm) {
       return 'radius';
-    }
-    if (params.bbox) {
-      return 'bbox';
     }
     if (params.city) {
       return 'city';

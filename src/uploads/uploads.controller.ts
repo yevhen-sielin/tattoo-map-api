@@ -1,29 +1,28 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+// src/uploads/uploads.controller.ts
+import { Body, Controller, Post, UseGuards, Req } from '@nestjs/common';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+class SignedUrlDto {
+  @IsString()
+  @IsNotEmpty()
+  fileName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  contentType!: string;
+}
+
 @Controller('uploads')
 export class UploadsController {
-  constructor(
-    private readonly uploads: UploadsService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly uploads: UploadsService) {}
 
   @Post('signed-url')
   @UseGuards(JwtAuthGuard)
-  async createSignedUrl(
-    @Body()
-    body: { fileName: string; contentType: string },
-  ) {
+  async createSignedUrl(@Req() req: any, @Body() body: SignedUrlDto) {
+    const userId: string = req.user.sub;
     const { fileName, contentType } = body;
-    const safeName = fileName.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const envPrefix =
-      this.config.get<string>('SUPABASE_PATH_PREFIX') ||
-      (process.env.NODE_ENV === 'production' ? 'prod' : 'dev');
-    const path = `${envPrefix}/${Date.now()}_${safeName}`;
-    const data = await this.uploads.createSignedUploadUrl(path, contentType);
-    const publicUrl = this.uploads.getPublicUrl(path);
-    return { ...data, publicUrl };
+    return this.uploads.createSignedUploadUrl(userId, fileName, contentType);
   }
 }

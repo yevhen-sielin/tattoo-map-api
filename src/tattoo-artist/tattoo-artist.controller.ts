@@ -12,7 +12,7 @@ import { TattooArtistService } from './tattoo-artist.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/auth.controller';
 import type { User as JwtUser } from '../auth/types';
-import { SearchArtistsDto, parseBbox } from './dto/search-artists.dto';
+import { SearchArtistsDto } from './dto/search-artists.dto';
 
 @Controller('tattoo-artist')
 export class TattooArtistController {
@@ -20,7 +20,6 @@ export class TattooArtistController {
 
   @Get()
   findAll(@Query() query: SearchArtistsDto) {
-    const bbox = parseBbox(query);
     const styles = query.styles
       ? query.styles
           .split(',')
@@ -28,7 +27,6 @@ export class TattooArtistController {
           .filter(Boolean)
       : [];
     return this.tattooArtistService.search({
-      bbox,
       styles,
       countryCode: query.countryCode ? query.countryCode.trim() : null,
       regionCode: query.regionCode ? query.regionCode.trim() : null,
@@ -43,6 +41,12 @@ export class TattooArtistController {
       radiusKm: query.radiusKm ?? null,
       limit: query.limit ?? 500,
     });
+  }
+
+  @Get('top')
+  async top(@Query('limit') limit?: string) {
+    const lim = limit != null ? Number(limit) : undefined;
+    return this.tattooArtistService.topByLikes(lim);
   }
 
   @Get(':id')
