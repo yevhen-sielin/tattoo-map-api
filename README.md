@@ -1,98 +1,107 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Tattoo Map API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend service for [Tattoo Map](https://tattmap.com) — a platform that helps people discover tattoo artists on an interactive map.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech Stack
 
-## Description
+- **Runtime:** Node.js 20, TypeScript
+- **Framework:** NestJS 11
+- **Database:** PostgreSQL 16, Prisma 7
+- **Auth:** Google OAuth 2.0, JWT (httpOnly cookies)
+- **Storage:** AWS S3 + CloudFront CDN
+- **Hosting:** AWS ECS Fargate
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## API Endpoints
 
-## Project setup
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` | — | Health check |
+| `GET` | `/auth/google` | — | Start Google OAuth flow |
+| `GET` | `/auth/google/callback` | — | OAuth callback |
+| `GET` | `/auth/me` | JWT | Current user profile |
+| `GET` | `/auth/logout` | — | Clear auth cookie |
+| `GET` | `/tattoo-artist` | — | Search/filter artists |
+| `GET` | `/tattoo-artist/top` | — | Top artists by likes |
+| `GET` | `/tattoo-artist/:id` | — | Artist by ID |
+| `POST` | `/tattoo-artist` | JWT | Create/update artist profile |
+| `DELETE` | `/tattoo-artist` | JWT | Delete artist profile |
+| `POST` | `/tattoo-artist/:id/like` | JWT | Like artist |
+| `DELETE` | `/tattoo-artist/:id/like` | JWT | Unlike artist |
+| `GET` | `/tattoo-artist/:id/like` | JWT | Check if liked |
+| `POST` | `/uploads/signed-url` | JWT | Get S3 presigned upload URL |
 
-```bash
-$ pnpm install
-```
+### Search Parameters
 
-## Compile and run the project
+`GET /tattoo-artist` supports:
 
-```bash
-# development
-$ pnpm run start
+- `styles` — filter by tattoo styles
+- `countryCode`, `regionCode`, `city` — location filters
+- `q` — text search (nickname)
+- `beginner`, `color`, `blackAndGray`, `coverups` — boolean filters
+- `centerLat`, `centerLon`, `radiusKm` — geo-radius search
+- `limit` — result limit
 
-# watch mode
-$ pnpm run start:dev
+## Database Schema
 
-# production mode
-$ pnpm run start:prod
-```
+**Models:** User, Artist, Like
 
-## Run tests
+- **User** — Google OAuth profile (email, name, avatar, role)
+- **Artist** — tattoo artist profile with location, styles, contacts, photos, geo coordinates
+- **Like** — user-to-artist like (unique per pair)
 
-```bash
-# unit tests
-$ pnpm run test
+## Local Development
 
-# e2e tests
-$ pnpm run test:e2e
+Recommended: use [tattoo-map-infra](https://github.com/yevhen-sielin/tattoo-map-infra) for Docker Compose orchestration.
 
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Standalone:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm install
+cp .env.dev .env
+pnpm start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Database
 
-## Resources
+```bash
+pnpm prisma migrate dev    # apply migrations
+pnpm prisma studio          # visual DB browser on :5555
+pnpm db:seed                # seed sample data
+pnpm db:reset:seed          # reset + seed
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+## Environment Variables
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `DIRECT_URL` | Direct DB connection (migrations) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_CALLBACK_URL` | OAuth callback URL |
+| `JWT_SECRET` | JWT signing secret |
+| `JWT_EXPIRES_IN` | Token TTL (default: `7d`) |
+| `FRONTEND_URLS` | Allowed CORS origins (comma-separated) |
+| `S3_BUCKET` | AWS S3 bucket for uploads |
+| `CDN_BASE_URL` | CloudFront CDN base URL |
+| `AWS_REGION` | AWS region |
+| `COOKIE_DOMAIN` | Cookie domain (optional) |
 
-## Support
+## CI/CD
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- **Push to `main`** — auto-deploy to dev (`api.dev.tattmap.com`)
+- **Manual trigger** — deploy to prod (`api.tattmap.com`)
 
-## Stay in touch
+See `.github/workflows/` for details.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Scripts
 
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+pnpm start:dev       # dev with watch mode
+pnpm build           # production build
+pnpm start:prod      # run production
+pnpm test            # unit tests
+pnpm test:e2e        # e2e tests
+pnpm lint            # ESLint
+pnpm format          # Prettier
+```
