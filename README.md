@@ -51,7 +51,7 @@ Backend service for [Tattoo Map](https://tattmap.com) — a platform that helps 
 
 ## Local Development
 
-Recommended: use [tattoo-map-infra](https://github.com/yevhen-sielin/tattoo-map-infra) for Docker Compose orchestration.
+Recommended: use [tattoo-map-sandbox](https://github.com/yevhen-sielin/tattoo-map-sandbox) for Docker Compose orchestration.
 
 Standalone:
 
