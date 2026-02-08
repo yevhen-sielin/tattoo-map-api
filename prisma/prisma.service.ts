@@ -1,21 +1,57 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly logger = new Logger(PrismaService.name);
+
   constructor() {
+    const isProd = process.env.NODE_ENV === 'production';
     const sslRequired =
       process.env.PGSSLMODE === 'require' ||
       process.env.DATABASE_SSL === '1' ||
-      process.env.NODE_ENV === 'production';
+      isProd;
+
+    let sslConfig:
+      | boolean
+      | { rejectUnauthorized: boolean; ca?: string }
+      | undefined;
+
+    if (sslRequired) {
+      // In production, verify the server certificate against the RDS CA bundle
+      // if available; otherwise fall back to rejectUnauthorized: false (AWS RDS
+      // uses Amazon-issued certs which may not be in the default OS trust store).
+      const caPath =
+        process.env.RDS_CA_BUNDLE_PATH ??
+        path.join(process.cwd(), 'rds-combined-ca-bundle.pem');
+      const caExists = fs.existsSync(caPath);
+
+      if (isProd && caExists) {
+        sslConfig = {
+          rejectUnauthorized: true,
+          ca: fs.readFileSync(caPath, 'utf8'),
+        };
+      } else {
+        // Dev/staging or CA bundle not present — still use SSL but skip verification
+        sslConfig = { rejectUnauthorized: false };
+      }
+    }
+
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: sslRequired ? { rejectUnauthorized: false } : undefined,
+      ssl: sslConfig,
     });
     super({ adapter: new PrismaPg(pool) });
   }

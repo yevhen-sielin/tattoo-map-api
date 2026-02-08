@@ -3,8 +3,14 @@
 // Extracted from inline magic numbers / strings across the codebase.
 // ---------------------------------------------------------------------------
 
+/** Auth session lifetime: 7 days */
+export const AUTH_TTL_DAYS = 7;
+
 /** Cookie time-to-live: 7 days in milliseconds */
-export const AUTH_COOKIE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const AUTH_COOKIE_TTL_MS = AUTH_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+/** JWT token expiry — must match the cookie TTL to avoid silent 401s */
+export const JWT_EXPIRY = `${AUTH_TTL_DAYS}d`;
 
 /** Default port when PORT env var is not set */
 export const DEFAULT_PORT = 3000;

@@ -7,21 +7,38 @@ import {
   ApiProperty,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsIn, MaxLength } from 'class-validator';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/auth.controller';
 import type { User as JwtUser } from '../auth/types';
 
+/** Only image MIME types are accepted for uploads */
+const ALLOWED_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+] as const;
+
 class SignedUrlDto {
   @ApiProperty({ description: 'Original file name', example: 'photo.jpg' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
   fileName!: string;
 
-  @ApiProperty({ description: 'MIME type', example: 'image/jpeg' })
+  @ApiProperty({
+    description: 'MIME type (images only)',
+    example: 'image/jpeg',
+    enum: ALLOWED_CONTENT_TYPES,
+  })
   @IsString()
   @IsNotEmpty()
+  @IsIn(ALLOWED_CONTENT_TYPES, {
+    message: `contentType must be one of: ${ALLOWED_CONTENT_TYPES.join(', ')}`,
+  })
   contentType!: string;
 }
 

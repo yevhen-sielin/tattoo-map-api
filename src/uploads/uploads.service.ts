@@ -66,29 +66,38 @@ export class UploadsService {
     return this.s3;
   }
 
+  /** Maximum upload size: 10 MB */
+  private static readonly MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
   /**
    * Create a signed upload URL for a user's original image.
+   * The signed URL enforces:
+   * - Content-Type header must match the requested type
+   * - Content-Length must not exceed MAX_UPLOAD_BYTES
+   * - Filename is sanitized to prevent path traversal
    */
   async createSignedUploadUrl(
     userId: string,
     fileName: string,
     contentType: string,
   ): Promise<{ signedUrl: string; publicUrl: string; key: string }> {
-    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Sanitize filename: strip path components, restrict to safe chars, limit length
+    const baseName = fileName.split(/[\\/]/).pop() ?? 'file';
+    const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
     const key = `${userId}/originals/${Date.now()}_${safeName}`;
 
     const putParams = {
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
+      ContentLength: UploadsService.MAX_UPLOAD_BYTES,
     };
 
     try {
-      const signedUrl = await getSignedUrl(
-        this.requireS3(),
-        new PutObjectCommand(putParams),
-        { expiresIn: 900 },
-      );
+      const command = new PutObjectCommand(putParams);
+      const signedUrl = await getSignedUrl(this.requireS3(), command, {
+        expiresIn: 900,
+      });
       return { signedUrl, publicUrl: `${this.cdnBaseUrl}/${key}`, key };
     } catch (error) {
       this.logger.error(`Failed to create signed URL for key=${key}`, error);

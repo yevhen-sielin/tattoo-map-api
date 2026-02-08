@@ -29,12 +29,6 @@ import { DEFAULT_SEARCH_LIMIT } from '../config/constants';
 export class TattooArtistController {
   constructor(private readonly tattooArtistService: TattooArtistService) {}
 
-  /** Temporary diagnostic endpoint — remove after debugging deploy issue */
-  @Get('version')
-  getVersion() {
-    return { version: 'v4-debug-raw-sql', ts: new Date().toISOString() };
-  }
-
   @Get()
   @ApiOperation({
     summary: 'Search artists by filters (styles, location, name, etc.)',

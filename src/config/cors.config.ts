@@ -30,7 +30,14 @@ export function getCorsOptions(): CorsOptions {
   const isProd = process.env.NODE_ENV === 'production';
   const allowlist = getEffectiveCorsAllowlist();
   const vercelWildcard = /\.vercel\.app$/i;
-  const allowAll = process.env.ALLOW_ALL_CORS === '1';
+  // ALLOW_ALL_CORS is only respected in non-production environments
+  const allowAll = !isProd && process.env.ALLOW_ALL_CORS === '1';
+
+  if (allowAll) {
+    console.warn(
+      '[CORS] ALLOW_ALL_CORS is active — all origins accepted (dev only)',
+    );
+  }
 
   return {
     origin: (origin, callback) => {
@@ -48,6 +55,7 @@ export function getCorsOptions(): CorsOptions {
       const isAllowedHostname =
         hostname === 'tattmap.com' ||
         hostname === 'www.tattmap.com' ||
+        hostname.endsWith('.tattmap.com') ||
         (isProd && vercelWildcard.test(hostname));
 
       const allowed =
