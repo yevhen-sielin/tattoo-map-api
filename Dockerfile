@@ -40,13 +40,14 @@
   ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public
   ENV DATABASE_URL=$DATABASE_URL
   
-  # 3) прод-зависимости (сюда подтянется @prisma/client)
-  #    👉 если prisma у тебя в devDependencies, это ок — ниже используем pnpm dlx
-  RUN pnpm install --frozen-lockfile
-  # Ensure Prisma Client is generated in the runtime image
-  RUN pnpm prisma generate || pnpm dlx prisma generate
-  
-  # 4) собранный код
+  # 3) прод-зависимости
+  RUN pnpm install --prod --frozen-lockfile
+
+  # 4) копируем сгенерированный Prisma Client из build-стадии
+  #    (вместо повторной генерации, которая требует CLI из devDependencies)
+  COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+
+  # 5) собранный код
   COPY --from=build /app/dist ./dist
   
   EXPOSE 3000
@@ -55,6 +56,6 @@
   # Пытаемся сначала локальным npx prisma (если добавишь "prisma" в dependencies),
   # иначе используем pnpm dlx (скачает CLI на лету).
   CMD ["sh", "-c", "\
-    (npx prisma migrate deploy || pnpm dlx prisma migrate deploy) && \
+    pnpm dlx prisma@7.0.1 migrate deploy && \
     node dist/src/main.js \
   "]
