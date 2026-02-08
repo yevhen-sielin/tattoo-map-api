@@ -37,39 +37,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Update ECS task definition with new image
-        id: update-task
-        run: |
-          # Get the current task definition
-          TASK_DEF=$(aws ecs describe-services \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.ECS_SERVICE }} \
-            --query 'services[0].taskDefinition' --output text)
-          echo "Current task def: $TASK_DEF"
-
-          # Get the full task definition JSON and update the image
-          NEW_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
-          echo "New image: $NEW_IMAGE"
-
-          aws ecs describe-task-definition --task-definition "$TASK_DEF" \
-            --query 'taskDefinition' \
-            | jq --arg IMG "$NEW_IMAGE" \
-              '.containerDefinitions[0].image = $IMG | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-            > /tmp/new-task-def.json
-
-          # Register the new task definition
-          NEW_TASK_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file:///tmp/new-task-def.json \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "New task def ARN: $NEW_TASK_ARN"
-          echo "task_arn=$NEW_TASK_ARN" >> "$GITHUB_OUTPUT"
-
       - name: Deploy to ECS
         run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.ECS_SERVICE }} \
-            --task-definition ${{ steps.update-task.outputs.task_arn }} \
             --force-new-deployment
           echo "Deployment triggered for ${{ env.ECS_SERVICE }}"
 
