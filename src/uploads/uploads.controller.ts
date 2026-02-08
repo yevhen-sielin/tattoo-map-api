@@ -1,9 +1,11 @@
 // src/uploads/uploads.controller.ts
-import { Body, Controller, Post, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsNotEmpty, IsString } from 'class-validator';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/auth.controller';
+import type { User as JwtUser } from '../auth/types';
 
 class SignedUrlDto {
   @IsString()
@@ -22,8 +24,8 @@ export class UploadsController {
   @Post('signed-url')
   @Throttle({ short: { limit: 5, ttl: 1_000 }, medium: { limit: 30, ttl: 60_000 } })
   @UseGuards(JwtAuthGuard)
-  async createSignedUrl(@Req() req: any, @Body() body: SignedUrlDto) {
-    const userId: string = req.user.sub;
+  async createSignedUrl(@CurrentUser() user: JwtUser, @Body() body: SignedUrlDto) {
+    const userId: string = user.sub;
     const { fileName, contentType } = body;
     return this.uploads.createSignedUploadUrl(userId, fileName, contentType);
   }

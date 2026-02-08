@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -16,14 +18,14 @@ export class AuthService {
     name?: string;
     avatar?: string;
   }): Promise<{ user: User; accessToken: string }> {
-    console.log('🌐 Incoming Google profile:', googleProfile);
+    this.logger.log(`Google auth: email=${googleProfile.email}`);
 
     let user = await this.prisma.user.findUnique({
       where: { googleId: googleProfile.googleId },
     });
 
     if (!user) {
-      console.log('🆕 Creating new user...');
+      this.logger.log(`Creating new user for googleId=${googleProfile.googleId}`);
 
       user = await this.prisma.user.create({
         data: {
@@ -34,7 +36,7 @@ export class AuthService {
         },
       });
     } else {
-      console.log('👤 User already exists:', user);
+      this.logger.log(`Existing user found: id=${user.id}`);
     }
 
     const payload = {

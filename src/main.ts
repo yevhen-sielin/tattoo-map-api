@@ -4,7 +4,7 @@ import * as dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
   getCorsOptions,
@@ -52,13 +52,15 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port, '0.0.0.0');
 
+  const logger = new Logger('Bootstrap');
   const appUrl = await app.getUrl();
-  console.log(`[BOOT] NODE_ENV=${process.env.NODE_ENV}  PORT=${port}`);
-  console.log(`[BOOT] API base: ${appUrl}  HEALTH: ${appUrl}/health`);
-  console.log(`[BOOT] CORS allowlist: ${allowlist.join(', ')}`);
+  logger.log(`NODE_ENV=${process.env.NODE_ENV}  PORT=${port}`);
+  logger.log(`API base: ${appUrl}  HEALTH: ${appUrl}/health`);
+  logger.log(`CORS allowlist: ${allowlist.join(', ')}`);
 }
 
 bootstrap().catch((err) => {
-  console.error('Error during bootstrap', err);
+  const logger = new Logger('Bootstrap');
+  logger.error('Error during bootstrap', err);
   process.exit(1);
 });

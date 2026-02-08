@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -13,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/auth.controller';
 import type { User as JwtUser } from '../auth/types';
 import { SearchArtistsDto } from './dto/search-artists.dto';
+import { UpsertArtistDto } from './dto/upsert-artist.dto';
 
 @Controller('tattoo-artist')
 export class TattooArtistController {
@@ -50,48 +52,14 @@ export class TattooArtistController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') userId: string) {
+  async findOne(@Param('id', ParseUUIDPipe) userId: string) {
     return this.tattooArtistService.findByUserId(userId);
   }
 
   @Post()
   @UseGuards(JwtAuthGuard)
   async upsertMine(
-    @Body()
-    body: {
-      city: string;
-      country: string;
-      countryCode?: string | null;
-      address: string;
-      nickname: string;
-      description: string;
-      styles: string[];
-      instagram: string;
-      beginner?: boolean;
-      coverups?: boolean;
-      color?: boolean;
-      blackAndGray?: boolean;
-      email?: string | null;
-      website?: string | null;
-      tiktok?: string | null;
-      facebook?: string | null;
-      telegram?: string | null;
-      whatsapp?: string | null;
-      wechat?: string | null;
-      snapchat?: string | null;
-      photos?: string[];
-      lat?: number | null;
-      lon?: number | null;
-      regionName?: string | null;
-      regionCode?: string | null;
-      regionCodeFull?: string | null;
-      postcode?: string | null;
-      streetName?: string | null;
-      addressNumber?: string | null;
-      routableLat?: number | null;
-      routableLon?: number | null;
-      geoRaw?: any;
-    },
+    @Body() body: UpsertArtistDto,
     @CurrentUser() user: JwtUser,
   ) {
     return this.tattooArtistService.upsertForCurrentUser(user.sub, body);
@@ -105,19 +73,28 @@ export class TattooArtistController {
 
   @Post(':id/like')
   @UseGuards(JwtAuthGuard)
-  async like(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {
+  async like(
+    @Param('id', ParseUUIDPipe) artistId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
     return this.tattooArtistService.likeArtist(user.sub, artistId);
   }
 
   @Delete(':id/like')
   @UseGuards(JwtAuthGuard)
-  async unlike(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {
+  async unlike(
+    @Param('id', ParseUUIDPipe) artistId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
     return this.tattooArtistService.unlikeArtist(user.sub, artistId);
   }
 
   @Get(':id/like')
   @UseGuards(JwtAuthGuard)
-  async isLiked(@Param('id') artistId: string, @CurrentUser() user: JwtUser) {
+  async isLiked(
+    @Param('id', ParseUUIDPipe) artistId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
     return this.tattooArtistService.isLikedBy(user.sub, artistId);
   }
 }

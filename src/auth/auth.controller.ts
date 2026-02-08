@@ -13,9 +13,9 @@ import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import type { User as JwtUser } from './types';
-
-type DecimalLike = { toNumber: () => number };
+import { decimalToNumber } from '../common/utils/decimal.util';
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext) =>
@@ -32,22 +32,6 @@ export class AuthController {
   // ==== helpers ====
   private isProd() {
     return process.env.NODE_ENV === 'production';
-  }
-
-  private toNum(v: unknown): number | null {
-    if (v == null) return null;
-
-    if (typeof v === 'object' && v !== null && 'toNumber' in v) {
-      return (v as DecimalLike).toNumber();
-    }
-
-    if (typeof v === 'number') return v;
-    if (typeof v === 'string') {
-      const n = Number(v);
-      return Number.isNaN(n) ? null : n;
-    }
-
-    return null;
   }
 
   private buildRedirectTarget(req: Request): string {
@@ -92,8 +76,10 @@ export class AuthController {
   // ==== Me / Logout ====
   @Get('me')
   @SkipThrottle()
-  @UseGuards(JwtAuthGuard)
-  async getMe(@CurrentUser() user: JwtUser) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getMe(@CurrentUser() user: JwtUser | null) {
+    // Not authenticated — return null with 200 (no console error in browser)
+    if (!user) return null;
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.sub },
       select: {
@@ -135,31 +121,9 @@ export class AuthController {
 
     const artist = dbUser?.artist
       ? {
-          city: dbUser.artist.city,
-          country: dbUser.artist.country,
-          countryCode: dbUser.artist.countryCode,
-          address: dbUser.artist.address,
-          nickname: dbUser.artist.nickname,
-          description: dbUser.artist.description,
-          styles: dbUser.artist.styles,
-          instagram: dbUser.artist.instagram,
-          beginner: dbUser.artist.beginner,
-          coverups: dbUser.artist.coverups,
-          color: dbUser.artist.color,
-          blackAndGray: dbUser.artist.blackAndGray,
-          email: dbUser.artist.email,
-          website: dbUser.artist.website,
-          tiktok: dbUser.artist.tiktok,
-          facebook: dbUser.artist.facebook,
-          telegram: dbUser.artist.telegram,
-          whatsapp: dbUser.artist.whatsapp,
-          wechat: dbUser.artist.wechat,
-          snapchat: dbUser.artist.snapchat,
-          avatar: dbUser.artist.avatar,
-          photos: dbUser.artist.photos,
-          lat: this.toNum(dbUser.artist.lat),
-          lon: this.toNum(dbUser.artist.lon),
-          geoRaw: dbUser.artist.geoRaw,
+          ...dbUser.artist,
+          lat: decimalToNumber(dbUser.artist.lat),
+          lon: decimalToNumber(dbUser.artist.lon),
         }
       : null;
 
