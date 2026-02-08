@@ -8,6 +8,7 @@ import {
   ExecutionContext,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -74,6 +75,7 @@ export class AuthController {
 
   // ==== Google OAuth ====
   @Get('google')
+  @Throttle({ short: { limit: 5, ttl: 1_000 }, medium: { limit: 20, ttl: 60_000 } })
   @UseGuards(AuthGuard('google'))
   async googleAuth(): Promise<void> {}
 
@@ -89,6 +91,7 @@ export class AuthController {
 
   // ==== Me / Logout ====
   @Get('me')
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   async getMe(@CurrentUser() user: JwtUser) {
     const dbUser = await this.prisma.user.findUnique({
