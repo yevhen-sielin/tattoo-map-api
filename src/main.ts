@@ -10,6 +10,7 @@ import {
   getCorsOptions,
   getEffectiveCorsAllowlist,
 } from './config/cors.config';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
 dotenv.config({ override: process.env.NODE_ENV !== 'production' });
 
@@ -34,6 +35,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   // ---------- CORS ----------
   app.enableCors(getCorsOptions());

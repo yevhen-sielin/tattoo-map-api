@@ -310,9 +310,15 @@ export class TattooArtistService {
   }
 
   async unlikeArtist(userId: string, artistId: string) {
-    await this.prisma.like
-      .delete({ where: { userId_artistId: { userId, artistId } } })
-      .catch(() => {});
+    try {
+      await this.prisma.like.delete({
+        where: { userId_artistId: { userId, artistId } },
+      });
+    } catch (error: unknown) {
+      // P2025 = record not found — idempotent unlike, not an error
+      const prismaError = error as { code?: string };
+      if (prismaError.code !== 'P2025') throw error;
+    }
     const count = await this.prisma.like.count({ where: { artistId } });
     return { artistId, likes: count };
   }

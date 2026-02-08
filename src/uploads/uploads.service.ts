@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -13,6 +17,7 @@ type RequiredEnv = 'AWS_REGION' | 'S3_BUCKET' | 'CDN_BASE_URL';
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
   private readonly s3: S3Client;
   private readonly bucket: string;
   private readonly cdnBaseUrl: string;
@@ -56,13 +61,17 @@ export class UploadsService {
       ContentType: contentType,
     };
 
-    return {
-      signedUrl: await getSignedUrl(this.s3, new PutObjectCommand(putParams), {
-        expiresIn: 900,
-      }),
-      publicUrl: `${this.cdnBaseUrl}/${key}`,
-      key,
-    };
+    try {
+      const signedUrl = await getSignedUrl(
+        this.s3,
+        new PutObjectCommand(putParams),
+        { expiresIn: 900 },
+      );
+      return { signedUrl, publicUrl: `${this.cdnBaseUrl}/${key}`, key };
+    } catch (error) {
+      this.logger.error(`Failed to create signed URL for key=${key}`, error);
+      throw new InternalServerErrorException('Failed to generate upload URL');
+    }
   }
 
   /**
@@ -72,28 +81,33 @@ export class UploadsService {
     const prefix = `${userId}/`;
     let continuationToken: string | undefined;
 
-    do {
-      const list = await this.s3.send(
-        new ListObjectsV2Command({
-          Bucket: this.bucket,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        }),
-      );
-
-      const keys = (list.Contents ?? []).map((o) => o.Key!).filter(Boolean);
-      if (keys.length) {
-        await this.s3.send(
-          new DeleteObjectsCommand({
+    try {
+      do {
+        const list = await this.s3.send(
+          new ListObjectsV2Command({
             Bucket: this.bucket,
-            Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
           }),
         );
-      }
 
-      continuationToken = list.IsTruncated
-        ? list.NextContinuationToken
-        : undefined;
-    } while (continuationToken);
+        const keys = (list.Contents ?? []).map((o) => o.Key!).filter(Boolean);
+        if (keys.length) {
+          await this.s3.send(
+            new DeleteObjectsCommand({
+              Bucket: this.bucket,
+              Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+            }),
+          );
+        }
+
+        continuationToken = list.IsTruncated
+          ? list.NextContinuationToken
+          : undefined;
+      } while (continuationToken);
+    } catch (error) {
+      this.logger.error(`Failed to delete S3 objects for user=${userId}`, error);
+      throw new InternalServerErrorException('Failed to delete user files');
+    }
   }
 }
