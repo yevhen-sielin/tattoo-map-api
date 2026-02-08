@@ -99,19 +99,17 @@ export class TattooArtistService {
     }
 
     // Fallback: return all points (no bbox)
-    const rows = await this.prisma.artist.findMany({
-      where: { lat: { not: null }, lon: { not: null } },
-      select: { userId: true, lat: true, lon: true },
-    });
-
-    return rows
-      .map((r) => {
-        const lat = r.lat ? Number(r.lat) : null;
-        const lon = r.lon ? Number(r.lon) : null;
-        if (lat == null || lon == null) return null;
-        return { userId: r.userId, lat, lon };
-      })
-      .filter(Boolean) as { userId: string; lat: number; lon: number }[];
+    // Uses raw SQL to avoid Prisma ORM issues with the Unsupported
+    // geography column added by PostGIS — the pg adapter can silently
+    // return undefined when `select` is used on models with Unsupported fields.
+    const rows = await this.prisma.$queryRawUnsafe<
+      { userId: string; lat: number; lon: number }[]
+    >(
+      `SELECT "userId", "lat"::float8 AS lat, "lon"::float8 AS lon
+       FROM "Artist"
+       WHERE "lat" IS NOT NULL AND "lon" IS NOT NULL`,
+    );
+    return rows;
   }
 
   async findByUserId(userId: string) {
