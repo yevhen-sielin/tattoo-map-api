@@ -54,9 +54,14 @@
   EXPOSE 3000
   
   # --- старт: применяем миграции и запускаем сервер ---
-  # Пытаемся сначала локальным npx prisma (если добавишь "prisma" в dependencies),
-  # иначе используем pnpm dlx (скачает CLI на лету).
+  # Migration is non-fatal: if it fails the server still starts.
+  # This prevents ECS from rolling back to stale containers when
+  # `pnpm dlx` or the config file has transient issues.
   CMD ["sh", "-c", "\
-    pnpm dlx prisma@7.0.1 migrate deploy && \
-    node dist/src/main.js \
+    echo '[deploy] Running migrations...' && \
+    (pnpm dlx prisma@7.0.1 migrate deploy \
+      && echo '[deploy] Migrations applied successfully' \
+      || echo '[deploy] WARNING: migrate deploy failed, continuing anyway'); \
+    echo '[deploy] Starting server...'; \
+    exec node dist/src/main.js \
   "]

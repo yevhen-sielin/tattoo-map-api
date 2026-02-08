@@ -69,39 +69,23 @@ export class TattooArtistController {
     summary:
       'Lightweight endpoint returning only coordinates for map clustering. Pass bbox params for viewport filtering.',
   })
-  async points(@Query() query: BboxQueryDto) {
+  points(@Query() query: BboxQueryDto) {
     const hasBbox =
       query.swLng != null &&
       query.swLat != null &&
       query.neLng != null &&
       query.neLat != null;
 
-    console.log('[points] hasBbox:', hasBbox, 'query:', JSON.stringify(query));
-
-    try {
-      const result = await this.tattooArtistService.findAllPoints(
-        hasBbox
-          ? {
-              swLng: query.swLng!,
-              swLat: query.swLat!,
-              neLng: query.neLng!,
-              neLat: query.neLat!,
-            }
-          : undefined,
-      );
-      console.log(
-        '[points] result type:',
-        typeof result,
-        'isArray:',
-        Array.isArray(result),
-        'length:',
-        result?.length,
-      );
-      return result;
-    } catch (err) {
-      console.error('[points] ERROR:', err);
-      throw err;
-    }
+    return this.tattooArtistService.findAllPoints(
+      hasBbox
+        ? {
+            swLng: query.swLng!,
+            swLat: query.swLat!,
+            neLng: query.neLng!,
+            neLat: query.neLat!,
+          }
+        : undefined,
+    );
   }
 
   @Get('top')
