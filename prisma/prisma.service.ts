@@ -54,6 +54,18 @@ export class PrismaService
       ssl: sslConfig,
     });
     super({ adapter: new PrismaPg(pool) });
+
+    // Log SSL mode at startup for diagnostics
+    if (!sslConfig) {
+      console.log('[Prisma] SSL: disabled (local dev)');
+    } else if (
+      typeof sslConfig === 'object' &&
+      sslConfig.rejectUnauthorized
+    ) {
+      console.log('[Prisma] SSL: enabled with CA verification (production)');
+    } else {
+      console.log('[Prisma] SSL: enabled without CA verification');
+    }
   }
 
   async onModuleInit() {

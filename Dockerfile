@@ -60,6 +60,9 @@
 
   # 5) собранный код
   COPY --from=build /app/dist ./dist
+
+  # 6) RDS CA bundle for SSL certificate verification in production
+  COPY --from=build /app/rds-combined-ca-bundle.pem ./rds-combined-ca-bundle.pem
   
   EXPOSE 3000
   
