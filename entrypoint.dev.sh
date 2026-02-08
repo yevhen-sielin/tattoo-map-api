@@ -19,7 +19,7 @@ if [ -n "${DATABASE_URL:-}" ]; then
 fi
 
 # Install deps once inside the container (safe for bind mounts)
-if [ ! -d node_modules ]; then
+if [ ! -d node_modules ] || [ -z "$(ls -A node_modules 2>/dev/null || true)" ]; then
   log "Installing dependencies (pnpm) ..."
   corepack enable >/dev/null 2>&1 || true
   pnpm install --prefer-offline

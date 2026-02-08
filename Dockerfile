@@ -10,6 +10,9 @@
   COPY package.json pnpm-lock.yaml ./
   RUN pnpm install --frozen-lockfile
   COPY . .
+  # Provide a safe default DATABASE_URL for Prisma generate at build time (no real connection is made)
+  ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public
+  ENV DATABASE_URL=$DATABASE_URL
   RUN pnpm prisma generate
   
   # чтобы импорты из ../../prisma продолжали работать
@@ -28,13 +31,20 @@
   
   # 1) манифесты пакетов
   COPY package.json pnpm-lock.yaml ./
+  # Prisma 7 config for migrate/db push at runtime
+  COPY --from=build /app/prisma.config.ts ./
   
   # 2) prisma схема (до установки, чтобы @prisma/client сделал postinstall generate)
   COPY --from=build /app/prisma ./prisma
+  # Provide a safe default DATABASE_URL so postinstall/generate can read prisma.config.ts
+  ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public
+  ENV DATABASE_URL=$DATABASE_URL
   
   # 3) прод-зависимости (сюда подтянется @prisma/client)
   #    👉 если prisma у тебя в devDependencies, это ок — ниже используем pnpm dlx
-  RUN pnpm install --prod --frozen-lockfile
+  RUN pnpm install --frozen-lockfile
+  # Ensure Prisma Client is generated in the runtime image
+  RUN pnpm prisma generate || pnpm dlx prisma generate
   
   # 4) собранный код
   COPY --from=build /app/dist ./dist

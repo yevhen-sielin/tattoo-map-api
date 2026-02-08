@@ -1,7 +1,10 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { makeRandomUsers, makeFixedAddressUsers, type SeedUser } from './seed-data-european';
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 function toDecimal6(value?: number | null): Prisma.Decimal | null {
   if (value == null) return null;

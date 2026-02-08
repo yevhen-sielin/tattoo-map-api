@@ -1,11 +1,25 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 @Injectable()
 export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  constructor() {
+    const sslRequired =
+      process.env.PGSSLMODE === 'require' ||
+      process.env.DATABASE_SSL === '1' ||
+      process.env.NODE_ENV === 'production';
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: sslRequired ? { rejectUnauthorized: false } : undefined,
+    });
+    super({ adapter: new PrismaPg(pool) });
+  }
+
   async onModuleInit() {
     // Log the DB connection target for diagnostics
     try {

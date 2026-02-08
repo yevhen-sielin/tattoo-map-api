@@ -53,10 +53,9 @@ export class AuthController {
     const origin =
       this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
     const success = this.config.get<string>('FRONTEND_SUCCESS_PATH') ?? '/';
-
-    const rawState = typeof req.query.state === 'string' ? req.query.state : undefined;
+    const rawState =
+      typeof req.query.state === 'string' ? req.query.state : undefined;
     const returnTo = rawState?.startsWith('/') ? rawState : undefined;
-
     return `${origin.replace(/\/$/, '')}${returnTo ?? success}`;
   }
 
@@ -82,7 +81,8 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
-    const token = (req.user as { accessToken?: string } | undefined)?.accessToken;
+    const userWithToken = req.user as { accessToken?: string } | undefined;
+    const token = userWithToken?.accessToken;
     this.setAuthCookie(res, token);
     return res.redirect(302, this.buildRedirectTarget(req));
   }
@@ -160,12 +160,20 @@ export class AuthController {
         }
       : null;
 
+    // Collect liked artist IDs for the current user
+    const liked = await this.prisma.like.findMany({
+      where: { userId: user.sub },
+      select: { artistId: true },
+    });
+    const likedArtistIds = liked.map((l) => l.artistId);
+
     return {
       sub: dbUser?.id ?? user.sub,
       role: dbUser?.role ?? user.role,
       name: dbUser?.name,
       avatar: dbUser?.avatar,
       artist,
+      likedArtistIds,
     };
   }
 
