@@ -14,11 +14,16 @@
   ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public
   ENV DATABASE_URL=$DATABASE_URL
   RUN pnpm prisma generate
-  # Save generated Prisma Client to a flat dir (follows pnpm symlinks)
-  # @prisma/client — the npm package (thin re-export wrapper)
-  # .prisma/client — the GENERATED code (schema-specific types + engine)
-  RUN cp -rL node_modules/@prisma/client /tmp/prisma-client \
-   && cp -rL node_modules/.prisma/client  /tmp/prisma-generated
+  # Save Prisma artefacts to flat dirs (resolves pnpm symlinks).
+  # We need three pieces:
+  #   @prisma/client               — thin npm wrapper that re-exports .prisma/client
+  #   .prisma/client                — schema-generated code (PrismaClient, types, engine)
+  #   @prisma/client-runtime-utils  — runtime dependency used by generated client.js
+  RUN mkdir -p /tmp/prisma-pkgs/@prisma \
+   && cp -rL node_modules/@prisma/client /tmp/prisma-pkgs/@prisma/client \
+   && cp -rL node_modules/.prisma        /tmp/prisma-pkgs/.prisma \
+   && cp -rL $(find node_modules/.pnpm -path '*/node_modules/@prisma/client-runtime-utils' -type d | head -1) \
+             /tmp/prisma-pkgs/@prisma/client-runtime-utils
 
   # чтобы импорты из ../../prisma продолжали работать
   RUN ln -sfn /app/prisma /app/src/prisma
@@ -48,9 +53,10 @@
   # 3) прод-зависимости
   RUN pnpm install --prod --frozen-lockfile
 
-  # 4) overlay generated Prisma Client from build stage
-  COPY --from=build /tmp/prisma-client    ./node_modules/@prisma/client
-  COPY --from=build /tmp/prisma-generated ./node_modules/.prisma/client
+  # 4) overlay generated Prisma Client + runtime deps from build stage
+  COPY --from=build /tmp/prisma-pkgs/@prisma/client               ./node_modules/@prisma/client
+  COPY --from=build /tmp/prisma-pkgs/.prisma                      ./node_modules/.prisma
+  COPY --from=build /tmp/prisma-pkgs/@prisma/client-runtime-utils ./node_modules/@prisma/client-runtime-utils
 
   # 5) собранный код
   COPY --from=build /app/dist ./dist
