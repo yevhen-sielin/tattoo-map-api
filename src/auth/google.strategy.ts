@@ -18,12 +18,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     private readonly config: ConfigService,
     private readonly authService: AuthService,
   ) {
-    // Required Google credentials
-    const clientID = config.get<string>('GOOGLE_CLIENT_ID');
-    const clientSecret = config.get<string>('GOOGLE_CLIENT_SECRET');
-    if (!clientID || !clientSecret) {
-      throw new Error('Missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET');
-    }
+    // Google credentials — use placeholders if missing so the server
+    // can still start (OAuth flow will fail, but other routes will work).
+    const clientID =
+      config.get<string>('GOOGLE_CLIENT_ID') || 'NOT_CONFIGURED';
+    const clientSecret =
+      config.get<string>('GOOGLE_CLIENT_SECRET') || 'NOT_CONFIGURED';
 
     /**
      * Callback URL rules:

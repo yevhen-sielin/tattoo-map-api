@@ -13,26 +13,38 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-type RequiredEnv = 'AWS_REGION' | 'S3_BUCKET' | 'CDN_BASE_URL';
-
 @Injectable()
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
-  private readonly s3: S3Client;
+  private readonly s3: S3Client | null;
   private readonly bucket: string;
   private readonly cdnBaseUrl: string;
+  private readonly configured: boolean;
 
   constructor(private readonly config: ConfigService) {
-    const req = (k: RequiredEnv): string => {
-      const v = this.config.get<string>(k);
-      if (!v) throw new Error(`Missing env ${k}`);
-      return v;
-    };
+    const bucket = this.config.get<string>('S3_BUCKET') ?? '';
+    const cdnBaseUrl = this.config.get<string>('CDN_BASE_URL') ?? '';
+    const region = this.config.get<string>('AWS_REGION') ?? '';
 
-    this.bucket = req('S3_BUCKET');
-    this.cdnBaseUrl = req('CDN_BASE_URL');
+    this.bucket = bucket;
+    this.cdnBaseUrl = cdnBaseUrl;
+    this.configured = !!(bucket && cdnBaseUrl && region);
 
-    const region = req('AWS_REGION');
+    if (!this.configured) {
+      this.logger.warn(
+        'S3 uploads disabled — missing env: ' +
+          [
+            !bucket && 'S3_BUCKET',
+            !cdnBaseUrl && 'CDN_BASE_URL',
+            !region && 'AWS_REGION',
+          ]
+            .filter(Boolean)
+            .join(', '),
+      );
+      this.s3 = null;
+      return;
+    }
+
     const accessKeyId = this.config.get<string>('AWS_ACCESS_KEY_ID');
     const secretAccessKey = this.config.get<string>('AWS_SECRET_ACCESS_KEY');
 
@@ -42,6 +54,16 @@ export class UploadsService {
     }
 
     this.s3 = new S3Client(cfg);
+  }
+
+  /** Throws if S3 is not configured. */
+  private requireS3(): S3Client {
+    if (!this.s3) {
+      throw new InternalServerErrorException(
+        'File uploads are not configured (missing S3 env vars)',
+      );
+    }
+    return this.s3;
   }
 
   /**
@@ -63,7 +85,7 @@ export class UploadsService {
 
     try {
       const signedUrl = await getSignedUrl(
-        this.s3,
+        this.requireS3(),
         new PutObjectCommand(putParams),
         { expiresIn: 900 },
       );
@@ -81,9 +103,10 @@ export class UploadsService {
     const prefix = `${userId}/`;
     let continuationToken: string | undefined;
 
+    const s3 = this.requireS3();
     try {
       do {
-        const list = await this.s3.send(
+        const list = await s3.send(
           new ListObjectsV2Command({
             Bucket: this.bucket,
             Prefix: prefix,
@@ -93,7 +116,7 @@ export class UploadsService {
 
         const keys = (list.Contents ?? []).map((o) => o.Key!).filter(Boolean);
         if (keys.length) {
-          await this.s3.send(
+          await s3.send(
             new DeleteObjectsCommand({
               Bucket: this.bucket,
               Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },

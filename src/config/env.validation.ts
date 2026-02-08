@@ -2,8 +2,10 @@ import * as Joi from 'joi';
 
 /**
  * Joi schema that validates required environment variables at startup.
- * If any required variable is missing, NestJS will throw immediately
- * instead of crashing later at runtime with an opaque error.
+ *
+ * Only DATABASE_URL and JWT_SECRET are truly required — everything else
+ * defaults to empty/safe values so the container can always start.
+ * Missing optional vars are logged as warnings in `main.ts`.
  */
 export const envValidationSchema = Joi.object({
   // ── Core ──────────────────────────────────────────────────────
@@ -12,35 +14,25 @@ export const envValidationSchema = Joi.object({
     .default('development'),
   PORT: Joi.number().default(3000),
 
-  // ── Database ──────────────────────────────────────────────────
-  DATABASE_URL: Joi.string().uri().required().messages({
+  // ── Database (critical — server cannot function without it) ──
+  DATABASE_URL: Joi.string().required().messages({
     'any.required': 'DATABASE_URL is required (PostgreSQL connection string)',
   }),
 
-  // ── Auth: JWT ─────────────────────────────────────────────────
+  // ── Auth: JWT (critical — auth routes will crash without it) ─
   JWT_SECRET: Joi.string().min(16).required().messages({
     'any.required': 'JWT_SECRET is required (min 16 characters)',
     'string.min': 'JWT_SECRET must be at least 16 characters',
   }),
 
-  // ── Auth: Google OAuth ────────────────────────────────────────
-  GOOGLE_CLIENT_ID: Joi.string().required().messages({
-    'any.required': 'GOOGLE_CLIENT_ID is required for Google OAuth',
-  }),
-  GOOGLE_CLIENT_SECRET: Joi.string().required().messages({
-    'any.required': 'GOOGLE_CLIENT_SECRET is required for Google OAuth',
-  }),
+  // ── Auth: Google OAuth (optional — OAuth flow will fail) ─────
+  GOOGLE_CLIENT_ID: Joi.string().default(''),
+  GOOGLE_CLIENT_SECRET: Joi.string().default(''),
 
-  // ── AWS / S3 ──────────────────────────────────────────────────
-  AWS_REGION: Joi.string().required().messages({
-    'any.required': 'AWS_REGION is required for S3 uploads',
-  }),
-  S3_BUCKET: Joi.string().required().messages({
-    'any.required': 'S3_BUCKET is required for file uploads',
-  }),
-  CDN_BASE_URL: Joi.string().uri().required().messages({
-    'any.required': 'CDN_BASE_URL is required (CloudFront distribution URL)',
-  }),
+  // ── AWS / S3 (optional — uploads will fail) ──────────────────
+  AWS_REGION: Joi.string().default(''),
+  S3_BUCKET: Joi.string().default(''),
+  CDN_BASE_URL: Joi.string().default(''),
 
   // ── Optional (validated but not required) ─────────────────────
   AWS_ACCESS_KEY_ID: Joi.string().optional(),
