@@ -1,5 +1,6 @@
 // src/config/cors.config.ts
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { PRODUCTION_ORIGINS, LOCAL_ORIGINS } from './constants';
 
 /**
  * Returns a normalized allowlist of frontend origins that are permitted to call the API.
@@ -9,7 +10,7 @@ export function getEffectiveCorsAllowlist(): string[] {
   const rawList =
     process.env.FRONTEND_URLS ||
     process.env.FRONTEND_URL ||
-    'http://localhost:3000,http://localhost:3001';
+    LOCAL_ORIGINS;
 
   const allowlist = rawList
     .split(',')
@@ -17,7 +18,7 @@ export function getEffectiveCorsAllowlist(): string[] {
     .filter(Boolean);
 
   // Always include primary production domains
-  for (const origin of ['https://tattmap.com', 'https://www.tattmap.com']) {
+  for (const origin of PRODUCTION_ORIGINS) {
     if (!allowlist.includes(origin)) allowlist.push(origin);
   }
 

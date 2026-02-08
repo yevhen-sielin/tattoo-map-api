@@ -8,6 +8,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from '../../config/constants';
 
 export class SearchArtistsDto {
   // Filters
@@ -72,9 +73,9 @@ export class SearchArtistsDto {
   radiusKm?: number;
 
   @IsOptional()
-  @Transform(({ value }) => (value !== undefined ? Number(value) : 500))
+  @Transform(({ value }) => (value !== undefined ? Number(value) : DEFAULT_SEARCH_LIMIT))
   @IsInt()
   @Min(1)
-  @Max(2000)
-  limit?: number = 500;
+  @Max(MAX_SEARCH_LIMIT)
+  limit?: number = DEFAULT_SEARCH_LIMIT;
 }

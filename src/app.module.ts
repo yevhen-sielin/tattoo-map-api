@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { TattooArtistModule } from './tattoo-artist/tattoo-artist.module';
 import { AuthModule } from './auth/auth.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { HealthModule } from './health/health.module';
 import { envValidationSchema } from './config/env.validation';
 
 @Module({
@@ -33,6 +34,7 @@ import { envValidationSchema } from './config/env.validation';
     TattooArtistModule,
     AuthModule,
     UploadsModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

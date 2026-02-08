@@ -16,6 +16,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import type { User as JwtUser } from './types';
 import { decimalToNumber } from '../common/utils/decimal.util';
+import { AUTH_COOKIE_TTL_MS } from '../config/constants';
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext) =>
@@ -53,7 +54,7 @@ export class AuthController {
       secure: this.isProd(),
       domain: cookieDomain,
       path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: AUTH_COOKIE_TTL_MS,
     });
   }
 

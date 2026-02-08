@@ -5,12 +5,12 @@ import cookieParser from 'cookie-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { Logger, ValidationPipe } from '@nestjs/common';
-import type { Request, Response } from 'express';
 import {
   getCorsOptions,
   getEffectiveCorsAllowlist,
 } from './config/cors.config';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { DEFAULT_PORT } from './config/constants';
 
 dotenv.config({ override: process.env.NODE_ENV !== 'production' });
 
@@ -43,13 +43,7 @@ async function bootstrap() {
   const allowlist = getEffectiveCorsAllowlist();
   // --------------------------
 
-  // Health‑check для ALB/ECS/K8s
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.get('/health', (_req: Request, res: Response) => {
-    res.status(200).send('ok');
-  });
-
-  const port = Number(process.env.PORT ?? 3000);
+  const port = Number(process.env.PORT ?? DEFAULT_PORT);
   await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
