@@ -15,7 +15,10 @@
   ENV DATABASE_URL=$DATABASE_URL
   RUN pnpm prisma generate
   # Save generated Prisma Client to a flat dir (follows pnpm symlinks)
-  RUN cp -rL node_modules/@prisma/client /tmp/prisma-client
+  # @prisma/client — the npm package (thin re-export wrapper)
+  # .prisma/client — the GENERATED code (schema-specific types + engine)
+  RUN cp -rL node_modules/@prisma/client /tmp/prisma-client \
+   && cp -rL node_modules/.prisma/client  /tmp/prisma-generated
 
   # чтобы импорты из ../../prisma продолжали работать
   RUN ln -sfn /app/prisma /app/src/prisma
@@ -46,7 +49,8 @@
   RUN pnpm install --prod --frozen-lockfile
 
   # 4) overlay generated Prisma Client from build stage
-  COPY --from=build /tmp/prisma-client ./node_modules/@prisma/client
+  COPY --from=build /tmp/prisma-client    ./node_modules/@prisma/client
+  COPY --from=build /tmp/prisma-generated ./node_modules/.prisma/client
 
   # 5) собранный код
   COPY --from=build /app/dist ./dist
