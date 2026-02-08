@@ -44,3 +44,29 @@ jobs:
             --service ${{ env.ECS_SERVICE }} \
             --force-new-deployment
           echo "Deployment triggered for ${{ env.ECS_SERVICE }}"
+
+      - name: Wait for ECS deployment to stabilize
+        run: |
+          echo "Waiting for ECS service to stabilize (up to 5 min)..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+          && echo "✅ Service is stable" \
+          || echo "⚠️ Service did not stabilize within timeout"
+
+      - name: Show ECS service status
+        if: always()
+        run: |
+          echo "=== Service Deployments ==="
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].{desiredCount:desiredCount,runningCount:runningCount,deployments:deployments[*].{status:status,desiredCount:desiredCount,runningCount:runningCount,failedTasks:failedTasks,rolloutState:rolloutState,rolloutStateReason:rolloutStateReason,createdAt:createdAt}}' \
+            --output json
+          echo ""
+          echo "=== Recent ECS Events ==="
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --query 'services[0].events[:10]' \
+            --output json
