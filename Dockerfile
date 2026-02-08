@@ -14,7 +14,9 @@
   ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?schema=public
   ENV DATABASE_URL=$DATABASE_URL
   RUN pnpm prisma generate
-  
+  # Save generated Prisma Client to a flat dir (follows pnpm symlinks)
+  RUN cp -rL node_modules/@prisma/client /tmp/prisma-client
+
   # чтобы импорты из ../../prisma продолжали работать
   RUN ln -sfn /app/prisma /app/src/prisma
   
@@ -43,9 +45,8 @@
   # 3) прод-зависимости
   RUN pnpm install --prod --frozen-lockfile
 
-  # 4) копируем сгенерированный Prisma Client из build-стадии
-  #    (вместо повторной генерации, которая требует CLI из devDependencies)
-  COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+  # 4) overlay generated Prisma Client from build stage
+  COPY --from=build /tmp/prisma-client ./node_modules/@prisma/client
 
   # 5) собранный код
   COPY --from=build /app/dist ./dist
