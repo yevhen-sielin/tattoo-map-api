@@ -53,15 +53,9 @@
   
   EXPOSE 3000
   
-  # --- старт: применяем миграции и запускаем сервер ---
-  # Migration is non-fatal: if it fails the server still starts.
-  # This prevents ECS from rolling back to stale containers when
-  # `pnpm dlx` or the config file has transient issues.
-  CMD ["sh", "-c", "\
-    echo '[deploy] Running migrations...' && \
-    (pnpm dlx prisma@7.0.1 migrate deploy \
-      && echo '[deploy] Migrations applied successfully' \
-      || echo '[deploy] WARNING: migrate deploy failed, continuing anyway'); \
-    echo '[deploy] Starting server...'; \
-    exec node dist/src/main.js \
-  "]
+  # --- старт ---
+  # Migrations are applied separately (CI or manual).
+  # Previously `pnpm dlx prisma migrate deploy && node ...` was used here,
+  # but the `&&` caused ECS to roll back when the migration step failed
+  # (e.g. missing ts-node for prisma.config.ts in the runtime image).
+  CMD ["node", "dist/src/main.js"]
