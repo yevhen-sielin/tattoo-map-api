@@ -8,9 +8,7 @@ import { PRODUCTION_ORIGINS, LOCAL_ORIGINS } from './constants';
  */
 export function getEffectiveCorsAllowlist(): string[] {
   const rawList =
-    process.env.FRONTEND_URLS ||
-    process.env.FRONTEND_URL ||
-    LOCAL_ORIGINS;
+    process.env.FRONTEND_URLS || process.env.FRONTEND_URL || LOCAL_ORIGINS;
 
   const allowlist = rawList
     .split(',')

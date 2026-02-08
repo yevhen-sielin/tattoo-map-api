@@ -433,7 +433,9 @@ describe('TattooArtistService', () => {
     });
 
     it('should handle P2025 (record not found) gracefully', async () => {
-      const prismaError: Error & { code?: string } = new Error('Record not found');
+      const prismaError: Error & { code?: string } = new Error(
+        'Record not found',
+      );
       prismaError.code = 'P2025';
       prisma.like.delete.mockRejectedValue(prismaError);
       prisma.like.count.mockResolvedValue(0);
@@ -444,13 +446,15 @@ describe('TattooArtistService', () => {
     });
 
     it('should re-throw non-P2025 Prisma errors', async () => {
-      const otherError: Error & { code?: string } = new Error('Connection failed');
+      const otherError: Error & { code?: string } = new Error(
+        'Connection failed',
+      );
       otherError.code = 'P2024';
       prisma.like.delete.mockRejectedValue(otherError);
 
-      await expect(
-        service.unlikeArtist('user-1', 'artist-1'),
-      ).rejects.toThrow('Connection failed');
+      await expect(service.unlikeArtist('user-1', 'artist-1')).rejects.toThrow(
+        'Connection failed',
+      );
     });
   });
 

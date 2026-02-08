@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import {
   getCorsOptions,
   getEffectiveCorsAllowlist,
@@ -42,6 +43,21 @@ async function bootstrap() {
   app.enableCors(getCorsOptions());
   const allowlist = getEffectiveCorsAllowlist();
   // --------------------------
+
+  // ---------- Swagger ----------
+  if (process.env.NODE_ENV !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Tattoo Map API')
+      .setDescription(
+        'API for managing tattoo artists, authentication, and file uploads',
+      )
+      .setVersion('1.0')
+      .addCookieAuth('accessToken')
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
+  // -----------------------------
 
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
   await app.listen(port, '0.0.0.0');

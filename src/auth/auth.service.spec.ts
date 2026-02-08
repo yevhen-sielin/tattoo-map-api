@@ -160,24 +160,20 @@ describe('AuthService', () => {
 
   describe('edge cases', () => {
     it('should propagate Prisma errors', async () => {
-      prisma.user.findUnique.mockRejectedValue(
-        new Error('DB connection lost'),
-      );
+      prisma.user.findUnique.mockRejectedValue(new Error('DB connection lost'));
 
-      await expect(
-        service.validateOrCreateUser(googleProfile),
-      ).rejects.toThrow('DB connection lost');
+      await expect(service.validateOrCreateUser(googleProfile)).rejects.toThrow(
+        'DB connection lost',
+      );
     });
 
     it('should propagate JWT signing errors', async () => {
       prisma.user.findUnique.mockResolvedValue(mockUser());
-      jwtService.signAsync.mockRejectedValue(
-        new Error('JWT signing failed'),
-      );
+      jwtService.signAsync.mockRejectedValue(new Error('JWT signing failed'));
 
-      await expect(
-        service.validateOrCreateUser(googleProfile),
-      ).rejects.toThrow('JWT signing failed');
+      await expect(service.validateOrCreateUser(googleProfile)).rejects.toThrow(
+        'JWT signing failed',
+      );
     });
   });
 });

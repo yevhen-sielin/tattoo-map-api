@@ -7,8 +7,9 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { Prisma } from '@prisma/client';
-import { decimalToNumber, numberToDecimal6 } from '../common/utils/decimal.util';
+import { numberToDecimal6 } from '../common/utils/decimal.util';
 import { mapArtistToDto } from '../common/mappers/artist.mapper';
+import { MAX_SEARCH_LIMIT } from '../config/constants';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,18 +32,6 @@ type SearchParams = {
   skip?: number;
 };
 
-interface BoundingBox {
-  west: number;
-  south: number;
-  east: number;
-  north: number;
-}
-
-interface SearchFiltersResult {
-  where: Prisma.ArtistWhereInput;
-  needsClientSideFilter: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -59,7 +48,11 @@ export class TattooArtistService {
   // ── helpers ──────────────────────────────────────────────────────────────
 
   /** Clamp limit to a safe range */
-  private clampLimit(n: number | undefined, min = 1, max = 2000): number {
+  private clampLimit(
+    n: number | undefined,
+    min = 1,
+    max = MAX_SEARCH_LIMIT,
+  ): number {
     const v = Number.isFinite(n as number) ? (n as number) : 20;
     return Math.max(min, Math.min(max, v));
   }
@@ -71,6 +64,54 @@ export class TattooArtistService {
       orderBy: { createdAt: 'desc' },
     });
     return artists.map(mapArtistToDto);
+  }
+
+  /**
+   * Lightweight endpoint for map rendering.
+   * Returns only the minimal fields needed for pins / clusters:
+   * `{ userId, lat, lon }`.
+   *
+   * When `bbox` is provided (sw_lng, sw_lat, ne_lng, ne_lat), uses PostGIS
+   * `ST_MakeEnvelope` + GiST index for efficient viewport queries.
+   * Without bbox, returns all points (≈ 1 MB JSON for 50k rows).
+   */
+  async findAllPoints(bbox?: {
+    swLng: number;
+    swLat: number;
+    neLng: number;
+    neLat: number;
+  }): Promise<{ userId: string; lat: number; lon: number }[]> {
+    if (bbox) {
+      // PostGIS viewport query using the indexed geography column
+      const rows = await this.prisma.$queryRawUnsafe<
+        { userId: string; lat: number; lon: number }[]
+      >(
+        `SELECT "userId", "lat"::float8 AS lat, "lon"::float8 AS lon
+         FROM "Artist"
+         WHERE "location" IS NOT NULL
+           AND "location" && ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography`,
+        bbox.swLng,
+        bbox.swLat,
+        bbox.neLng,
+        bbox.neLat,
+      );
+      return rows;
+    }
+
+    // Fallback: return all points (no bbox)
+    const rows = await this.prisma.artist.findMany({
+      where: { lat: { not: null }, lon: { not: null } },
+      select: { userId: true, lat: true, lon: true },
+    });
+
+    return rows
+      .map((r) => {
+        const lat = r.lat ? Number(r.lat) : null;
+        const lon = r.lon ? Number(r.lon) : null;
+        if (lat == null || lon == null) return null;
+        return { userId: r.userId, lat, lon };
+      })
+      .filter(Boolean) as { userId: string; lat: number; lon: number }[];
   }
 
   async findByUserId(userId: string) {
@@ -89,27 +130,129 @@ export class TattooArtistService {
 
     this.logSearchType(params);
 
-    const { where, needsClientSideFilter } = this.buildSearchFilters(params);
-
-    const artists = await this.prisma.artist.findMany({
-      where,
-      take: limit,
-      skip,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const normalized = artists.map(mapArtistToDto);
-
-    // Client-side radius filtering (more accurate than bbox)
-    if (needsClientSideFilter) {
-      return this.applyRadiusFilter(normalized, params);
+    // PostGIS radius search — delegate entirely to raw SQL for accuracy
+    if (
+      params.centerLat != null &&
+      params.centerLon != null &&
+      params.radiusKm != null
+    ) {
+      return this.searchByRadius(params, limit, skip);
     }
 
-    return this.attachLikeCounts(normalized);
+    const { where } = this.buildSearchFilters(params);
+
+    const [artists, total] = await Promise.all([
+      this.prisma.artist.findMany({
+        where,
+        take: limit + 1,
+        skip,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.artist.count({ where }),
+    ]);
+
+    const hasMore = artists.length > limit;
+    const trimmed = hasMore ? artists.slice(0, limit) : artists;
+    const normalized = trimmed.map(mapArtistToDto);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const withLikes = await this.attachLikeCounts(normalized);
+    return { data: withLikes, total, hasMore };
   }
 
-  /** Construct the Prisma `where` clause from search parameters. */
-  private buildSearchFilters(params: SearchParams): SearchFiltersResult {
+  /**
+   * PostGIS-backed radius search using ST_DWithin.
+   * Uses the GiST-indexed `location` geography column for O(log n) performance.
+   */
+  private async searchByRadius(
+    params: SearchParams,
+    limit: number,
+    skip: number,
+  ) {
+    const radiusMeters = params.radiusKm! * 1000;
+    const center = `ST_SetSRID(ST_MakePoint(${params.centerLon!}, ${params.centerLat!}), 4326)::geography`;
+
+    // Build optional WHERE clauses for non-geo filters
+    const clauses: string[] = [
+      `"location" IS NOT NULL`,
+      `ST_DWithin("location", ${center}, ${radiusMeters})`,
+    ];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    if (params.countryCode?.trim()) {
+      const cc = params.countryCode.trim().toUpperCase();
+      clauses.push(`UPPER("countryCode") = $${paramIdx}`);
+      values.push(cc);
+      paramIdx++;
+    }
+    if (params.city?.trim()) {
+      clauses.push(`"city" ILIKE $${paramIdx}`);
+      values.push(`%${params.city.trim()}%`);
+      paramIdx++;
+    }
+    if (params.q?.trim()) {
+      const pattern = `%${params.q.trim()}%`;
+      clauses.push(
+        `("nickname" ILIKE $${paramIdx} OR "city" ILIKE $${paramIdx} OR "country" ILIKE $${paramIdx})`,
+      );
+      values.push(pattern);
+      paramIdx++;
+    }
+    if (params.beginner) {
+      clauses.push(`"beginner" = true`);
+    }
+    if (params.color) {
+      clauses.push(`"color" = true`);
+    }
+    if (params.blackAndGray) {
+      clauses.push(`"blackAndGray" = true`);
+    }
+    if (params.coverups) {
+      clauses.push(`"coverups" = true`);
+    }
+
+    const whereSQL = clauses.join(' AND ');
+
+    // Count + fetch in parallel using raw SQL
+    const countQuery = `SELECT COUNT(*)::int AS total FROM "Artist" WHERE ${whereSQL}`;
+    const dataQuery = `
+      SELECT *,
+             ST_Distance("location", ${center}) AS "_distanceMeters"
+      FROM "Artist"
+      WHERE ${whereSQL}
+      ORDER BY "_distanceMeters" ASC
+      LIMIT ${limit + 1} OFFSET ${skip}
+    `;
+
+    const [countRows, artists] = await Promise.all([
+      this.prisma.$queryRawUnsafe<{ total: number }[]>(countQuery, ...values),
+      this.prisma.$queryRawUnsafe<
+        Array<{
+          userId: string;
+          lat: unknown;
+          lon: unknown;
+          [k: string]: unknown;
+        }>
+      >(dataQuery, ...values),
+    ]);
+
+    const total = countRows[0]?.total ?? 0;
+    const hasMore = artists.length > limit;
+    const trimmed = hasMore ? artists.slice(0, limit) : artists;
+    const normalized = trimmed.map(mapArtistToDto);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    const withLikes = await this.attachLikeCounts(normalized);
+    return { data: withLikes, total, hasMore };
+  }
+
+  /**
+   * Construct the Prisma `where` clause from search parameters.
+   * Note: radius/geo queries are handled separately via PostGIS raw SQL
+   * in `searchByRadius()`, so this method only handles non-geo filters.
+   */
+  private buildSearchFilters(params: SearchParams): {
+    where: Prisma.ArtistWhereInput;
+  } {
     const where: Prisma.ArtistWhereInput = {};
     const AND: Prisma.ArtistWhereInput[] = [];
     const OR: Prisma.ArtistWhereInput[] = [];
@@ -126,7 +269,10 @@ export class TattooArtistService {
     }
     if (params.regionCode?.trim()) {
       AND.push({
-        regionCodeFull: { contains: params.regionCode.trim(), mode: 'insensitive' },
+        regionCodeFull: {
+          contains: params.regionCode.trim(),
+          mode: 'insensitive',
+        },
       });
     }
     if (params.city?.trim()) {
@@ -136,9 +282,20 @@ export class TattooArtistService {
     // ── style filters ──
     if (params.styles?.length) {
       const toTitle = (s: string) =>
-        s.toLowerCase().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        s
+          .toLowerCase()
+          .split(/\s+/)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ');
       const styleVariants = Array.from(
-        new Set(params.styles.flatMap((s) => [s, s.toLowerCase(), s.toUpperCase(), toTitle(s)])),
+        new Set(
+          params.styles.flatMap((s) => [
+            s,
+            s.toLowerCase(),
+            s.toUpperCase(),
+            toTitle(s),
+          ]),
+        ),
       );
       AND.push({ styles: { hasSome: styleVariants } });
     }
@@ -160,46 +317,10 @@ export class TattooArtistService {
     if (params.blackAndGray === true) AND.push({ blackAndGray: true });
     if (params.coverups === true) AND.push({ coverups: true });
 
-    // ── radius / bbox filter ──
-    let needsClientSideFilter = false;
-
-    if (params.centerLat != null && params.centerLon != null && params.radiusKm != null) {
-      const bbox = this.radiusToBbox(params.centerLat, params.centerLon, params.radiusKm);
-      AND.push({ lat: { not: null }, lon: { not: null } });
-      AND.push({ lat: { gte: numberToDecimal6(bbox.south)!, lte: numberToDecimal6(bbox.north)! } });
-
-      if (bbox.east >= bbox.west) {
-        AND.push({ lon: { gte: numberToDecimal6(bbox.west)!, lte: numberToDecimal6(bbox.east)! } });
-      } else {
-        // Wraps around the antimeridian
-        AND.push({
-          OR: [
-            { lon: { gte: numberToDecimal6(bbox.west)! } },
-            { lon: { lte: numberToDecimal6(bbox.east)! } },
-          ],
-        });
-      }
-      needsClientSideFilter = true;
-    }
-
     if (AND.length) where.AND = AND;
     if (OR.length) where.OR = OR;
 
-    return { where, needsClientSideFilter };
-  }
-
-  /** Post-filter artists by exact Haversine distance (more accurate than bbox). */
-  private applyRadiusFilter<T extends { lat: number | null; lon: number | null }>(
-    artists: T[],
-    params: SearchParams,
-  ): T[] {
-    if (params.centerLat == null || params.centerLon == null || params.radiusKm == null) {
-      return artists;
-    }
-    return artists.filter((a) => {
-      if (a.lat == null || a.lon == null) return false;
-      return this.calculateDistance(params.centerLat!, params.centerLon!, a.lat, a.lon) <= params.radiusKm!;
-    });
+    return { where };
   }
 
   /** Attach aggregated like counts to a list of mapped artists. */
@@ -211,7 +332,10 @@ export class TattooArtistService {
       _count: { artistId: true },
       where: { artistId: { in: artists.map((a) => a.userId) } },
     });
-    const mapCount = new Map(counts.map((c) => [c.artistId, c._count.artistId]));
+    const mapCount = new Map<string, number>(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      counts.map((c): [string, number] => [c.artistId, c._count.artistId]),
+    );
     return artists.map((a) => ({ ...a, likes: mapCount.get(a.userId) ?? 0 }));
   }
 
@@ -226,7 +350,8 @@ export class TattooArtistService {
     });
     return artists.map((a) => ({
       ...mapArtistToDto(a),
-      likes: (a as unknown as { _count?: { likes?: number } })._count?.likes ?? 0,
+      likes:
+        (a as unknown as { _count?: { likes?: number } })._count?.likes ?? 0,
     }));
   }
 
@@ -242,7 +367,9 @@ export class TattooArtistService {
       this.prisma.artist.findUnique({ where: { userId: artistId } }),
     ]);
     if (!user) {
-      throw new NotFoundException('User not found. Please authenticate to create a like.');
+      throw new NotFoundException(
+        'User not found. Please authenticate to create a like.',
+      );
     }
     if (!artist) {
       throw new NotFoundException('Artist not found');
@@ -360,11 +487,16 @@ export class TattooArtistService {
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
-    return this.prisma.artist.upsert({
+    const artist = await this.prisma.artist.upsert({
       where: { userId },
       update: payload,
       create: { userId, ...payload, avatar: user?.avatar ?? '' },
     });
+
+    // Keep PostGIS `location` column in sync with lat/lon
+    await this.syncLocation(userId, data.lat ?? null, data.lon ?? null);
+
+    return artist;
   }
 
   async deleteForCurrentUser(userId: string) {
@@ -376,37 +508,44 @@ export class TattooArtistService {
     return { success: true };
   }
 
-  // ── geo helpers ──────────────────────────────────────────────────────────
+  // ── PostGIS helpers ──────────────────────────────────────────────────────
 
-  private radiusToBbox(lat: number, lon: number, radiusKm: number): BoundingBox {
-    const dLat = radiusKm / 111;
-    const cosLat = Math.cos((lat * Math.PI) / 180) || 1e-6;
-    const dLon = radiusKm / (111 * cosLat);
-    return { west: lon - dLon, south: lat - dLat, east: lon + dLon, north: lat + dLat };
+  /**
+   * Update the PostGIS `location` geography column for an artist.
+   * Uses raw SQL because Prisma doesn't support geography natively.
+   */
+  private async syncLocation(
+    userId: string,
+    lat: number | null,
+    lon: number | null,
+  ): Promise<void> {
+    if (lat != null && lon != null) {
+      await this.prisma.$executeRaw`
+        UPDATE "Artist"
+        SET "location" = ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography
+        WHERE "userId" = ${userId}
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        UPDATE "Artist" SET "location" = NULL WHERE "userId" = ${userId}
+      `;
+    }
   }
 
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371;
-    const dLat = this.toRadians(lat2 - lat1);
-    const dLon = this.toRadians(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
-  }
+  // ── logging ──────────────────────────────────────────────────────────────
 
   private logSearchType(params: SearchParams): void {
     const cc = params.countryCode?.trim().toUpperCase() ?? null;
     const type =
-      params.centerLat && params.centerLon && params.radiusKm ? 'radius' :
-      params.city ? 'city' :
-      params.regionCode ? 'region' :
-      params.countryCode ? 'country' :
-      'global';
+      params.centerLat && params.centerLon && params.radiusKm
+        ? 'radius'
+        : params.city
+          ? 'city'
+          : params.regionCode
+            ? 'region'
+            : params.countryCode
+              ? 'country'
+              : 'global';
     this.logger.debug(
       `Search type=${type} cc=${cc ?? '-'} region=${params.regionCode ?? '-'} city=${params.city ?? '-'} radius=${!!(params.centerLat && params.centerLon && params.radiusKm)}`,
     );

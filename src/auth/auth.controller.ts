@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { JwtAuthGuard } from './jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import type { User as JwtUser } from './types';
 import { decimalToNumber } from '../common/utils/decimal.util';
@@ -23,6 +23,7 @@ export const CurrentUser = createParamDecorator(
     ctx.switchToHttp().getRequest<Request>().user,
 );
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -60,12 +61,18 @@ export class AuthController {
 
   // ==== Google OAuth ====
   @Get('google')
-  @Throttle({ short: { limit: 5, ttl: 1_000 }, medium: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Initiate Google OAuth flow' })
+  @Throttle({
+    short: { limit: 5, ttl: 1_000 },
+    medium: { limit: 20, ttl: 60_000 },
+  })
   @UseGuards(AuthGuard('google'))
   async googleAuth(): Promise<void> {}
 
-  /** Callback от Google: ставим httpOnly cookie и редиректим на фронт */
   @Get('google/callback')
+  @ApiOperation({
+    summary: 'Google OAuth callback — sets cookie and redirects',
+  })
   @UseGuards(AuthGuard('google'))
   googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
     const userWithToken = req.user as { accessToken?: string } | undefined;
@@ -76,6 +83,10 @@ export class AuthController {
 
   // ==== Me / Logout ====
   @Get('me')
+  @ApiOperation({
+    summary: 'Get current user profile (returns null if not authenticated)',
+  })
+  @ApiCookieAuth()
   @SkipThrottle()
   @UseGuards(OptionalJwtAuthGuard)
   async getMe(@CurrentUser() user: JwtUser | null) {
@@ -145,8 +156,8 @@ export class AuthController {
     };
   }
 
-  /** Выход — очищаем JWT cookie */
   @Get('logout')
+  @ApiOperation({ summary: 'Clear auth cookie and log out' })
   logout(@Res() res: Response) {
     const cookieDomain = this.config.get<string>('COOKIE_DOMAIN') || undefined;
     res.clearCookie('accessToken', {

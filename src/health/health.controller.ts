@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma/prisma.service';
 
 interface HealthResponse {
@@ -9,12 +10,14 @@ interface HealthResponse {
   error?: string;
 }
 
+@ApiTags('Health')
 @SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Health check with database connectivity' })
   async check(): Promise<HealthResponse> {
     const timestamp = new Date().toISOString();
 

@@ -1,15 +1,21 @@
-import { Prisma } from '@prisma/client';
 import { decimalToNumber } from '../utils/decimal.util';
 
-/** The raw DB artist row (at minimum contains lat/lon as Decimals). */
-interface ArtistRow {
-  lat: Prisma.Decimal | null;
-  lon: Prisma.Decimal | null;
+/** Structural match for Prisma.Decimal without relying on generated types. */
+interface DecimalValue {
+  toNumber(): number;
+}
+
+/** The raw DB artist row (at minimum contains userId + lat/lon as Decimals). */
+export interface ArtistRow {
+  userId: string;
+  lat: DecimalValue | null;
+  lon: DecimalValue | null;
   [key: string]: unknown;
 }
 
 /** Artist entity with lat/lon serialised as plain numbers. */
 export type MappedArtist<T extends ArtistRow> = Omit<T, 'lat' | 'lon'> & {
+  userId: string;
   lat: number | null;
   lon: number | null;
 };

@@ -9,11 +9,11 @@ export const AUTH_COOKIE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** Default port when PORT env var is not set */
 export const DEFAULT_PORT = 3000;
 
-/** Default query limit for artist search */
-export const DEFAULT_SEARCH_LIMIT = 500;
+/** Default query limit for artist search (sidebar / list views) */
+export const DEFAULT_SEARCH_LIMIT = 50;
 
-/** Max query limit for artist search */
-export const MAX_SEARCH_LIMIT = 2000;
+/** Max query limit for artist search (sidebar / list views) */
+export const MAX_SEARCH_LIMIT = 200;
 
 /** Production domain origins that are always allowed via CORS */
 export const PRODUCTION_ORIGINS = [

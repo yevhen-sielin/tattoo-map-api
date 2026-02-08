@@ -25,7 +25,9 @@ export class AuthService {
     });
 
     if (!user) {
-      this.logger.log(`Creating new user for googleId=${googleProfile.googleId}`);
+      this.logger.log(
+        `Creating new user for googleId=${googleProfile.googleId}`,
+      );
 
       user = await this.prisma.user.create({
         data: {

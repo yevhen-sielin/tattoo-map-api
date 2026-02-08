@@ -106,7 +106,10 @@ export class UploadsService {
           : undefined;
       } while (continuationToken);
     } catch (error) {
-      this.logger.error(`Failed to delete S3 objects for user=${userId}`, error);
+      this.logger.error(
+        `Failed to delete S3 objects for user=${userId}`,
+        error,
+      );
       throw new InternalServerErrorException('Failed to delete user files');
     }
   }
