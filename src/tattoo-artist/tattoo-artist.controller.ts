@@ -70,6 +70,7 @@ export class TattooArtistController {
       query.neLng != null &&
       query.neLat != null;
 
+    const hasFilters = query.countryCode || query.regionCode || query.city;
     return this.tattooArtistService.findAllPoints(
       hasBbox
         ? {
@@ -77,6 +78,13 @@ export class TattooArtistController {
             swLat: query.swLat!,
             neLng: query.neLng!,
             neLat: query.neLat!,
+          }
+        : undefined,
+      hasFilters
+        ? {
+            countryCode: query.countryCode || undefined,
+            regionCode: query.regionCode || undefined,
+            city: query.city || undefined,
           }
         : undefined,
     );

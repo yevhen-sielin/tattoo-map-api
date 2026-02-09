@@ -19,7 +19,7 @@ export const DEFAULT_PORT = 3000;
 export const DEFAULT_SEARCH_LIMIT = 50;
 
 /** Max query limit for artist search (sidebar / list views) */
-export const MAX_SEARCH_LIMIT = 200;
+export const MAX_SEARCH_LIMIT = 500;
 
 /** Production domain origins that are always allowed via CORS */
 export const PRODUCTION_ORIGINS = [

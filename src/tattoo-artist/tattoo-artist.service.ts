@@ -75,40 +75,57 @@ export class TattooArtistService {
    * `ST_MakeEnvelope` + GiST index for efficient viewport queries.
    * Without bbox, returns all points (≈ 1 MB JSON for 50k rows).
    */
-  async findAllPoints(bbox?: {
-    swLng: number;
-    swLat: number;
-    neLng: number;
-    neLat: number;
-  }): Promise<{ userId: string; lat: number; lon: number }[]> {
+  async findAllPoints(
+    bbox?: {
+      swLng: number;
+      swLat: number;
+      neLng: number;
+      neLat: number;
+    },
+    filters?: {
+      countryCode?: string;
+      regionCode?: string;
+      city?: string;
+    },
+  ): Promise<{ userId: string; lat: number; lon: number }[]> {
+    // Build dynamic WHERE clauses for optional filters
+    const conditions: string[] = [];
+    const params: (number | string)[] = [];
+    let paramIdx = 1;
+
     if (bbox) {
-      // PostGIS viewport query using the indexed geography column
-      const rows = await this.prisma.$queryRawUnsafe<
-        { userId: string; lat: number; lon: number }[]
-      >(
-        `SELECT "userId", "lat"::float8 AS lat, "lon"::float8 AS lon
-         FROM "Artist"
-         WHERE "location" IS NOT NULL
-           AND "location" && ST_MakeEnvelope($1, $2, $3, $4, 4326)::geography`,
-        bbox.swLng,
-        bbox.swLat,
-        bbox.neLng,
-        bbox.neLat,
+      conditions.push(
+        `"location" IS NOT NULL`,
+        `"location" && ST_MakeEnvelope($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, 4326)::geography`,
       );
-      return rows;
+      params.push(bbox.swLng, bbox.swLat, bbox.neLng, bbox.neLat);
+      paramIdx += 4;
+    } else {
+      conditions.push(`"lat" IS NOT NULL AND "lon" IS NOT NULL`);
     }
 
-    // Fallback: return all points (no bbox)
-    // Uses raw SQL to avoid Prisma ORM issues with the Unsupported
-    // geography column added by PostGIS — the pg adapter can silently
-    // return undefined when `select` is used on models with Unsupported fields.
+    if (filters?.countryCode) {
+      conditions.push(`UPPER("countryCode") = UPPER($${paramIdx})`);
+      params.push(filters.countryCode);
+      paramIdx++;
+    }
+    if (filters?.regionCode) {
+      conditions.push(`UPPER("regionCode") = UPPER($${paramIdx})`);
+      params.push(filters.regionCode);
+      paramIdx++;
+    }
+    if (filters?.city) {
+      conditions.push(`LOWER("city") = LOWER($${paramIdx})`);
+      params.push(filters.city);
+      paramIdx++;
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `SELECT "userId", "lat"::float8 AS lat, "lon"::float8 AS lon FROM "Artist" ${where}`;
+
     const rows = await this.prisma.$queryRawUnsafe<
       { userId: string; lat: number; lon: number }[]
-    >(
-      `SELECT "userId", "lat"::float8 AS lat, "lon"::float8 AS lon
-       FROM "Artist"
-       WHERE "lat" IS NOT NULL AND "lon" IS NOT NULL`,
-    );
+    >(sql, ...params);
     return rows;
   }
 
