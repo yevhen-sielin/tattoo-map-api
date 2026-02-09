@@ -82,6 +82,16 @@ export class TattooArtistController {
     );
   }
 
+  @Post('by-ids')
+  @ApiOperation({
+    summary:
+      'Fetch artists by a list of user IDs (used for cluster drill-down)',
+  })
+  findByIds(@Body() body: { userIds: string[] }) {
+    const ids = Array.isArray(body.userIds) ? body.userIds.slice(0, 1000) : [];
+    return this.tattooArtistService.findByUserIds(ids);
+  }
+
   @Get('top')
   @ApiOperation({ summary: 'Get top artists sorted by likes' })
   async top(@Query('limit') limit?: string) {

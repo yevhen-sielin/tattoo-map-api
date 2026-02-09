@@ -120,6 +120,23 @@ export class TattooArtistService {
     return a ? { ...mapArtistToDto(a), likes: count } : null;
   }
 
+  /**
+   * Batch fetch artists by a list of user IDs.
+   * Used by the frontend when drilling down into a map cluster.
+   */
+  async findByUserIds(userIds: string[]) {
+    if (!userIds.length) return [];
+
+    const artists = await this.prisma.artist.findMany({
+      where: { userId: { in: userIds } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const normalized = artists.map(mapArtistToDto);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    return this.attachLikeCounts(normalized);
+  }
+
   // ── search ───────────────────────────────────────────────────────────────
 
   async search(params: SearchParams) {
