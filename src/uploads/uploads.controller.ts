@@ -20,6 +20,8 @@ const ALLOWED_CONTENT_TYPES = [
   'image/webp',
   'image/gif',
   'image/avif',
+  'image/heic',
+  'image/heif',
 ] as const;
 
 class SignedUrlDto {
