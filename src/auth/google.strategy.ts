@@ -20,8 +20,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   ) {
     // Google credentials — use placeholders if missing so the server
     // can still start (OAuth flow will fail, but other routes will work).
-    const clientID =
-      config.get<string>('GOOGLE_CLIENT_ID') || 'NOT_CONFIGURED';
+    const clientID = config.get<string>('GOOGLE_CLIENT_ID') || 'NOT_CONFIGURED';
     const clientSecret =
       config.get<string>('GOOGLE_CLIENT_SECRET') || 'NOT_CONFIGURED';
 

@@ -57,14 +57,11 @@ export class PrismaService
 
     // Log SSL mode at startup for diagnostics
     if (!sslConfig) {
-      console.log('[Prisma] SSL: disabled (local dev)');
-    } else if (
-      typeof sslConfig === 'object' &&
-      sslConfig.rejectUnauthorized
-    ) {
-      console.log('[Prisma] SSL: enabled with CA verification (production)');
+      this.logger.log('SSL: disabled (local dev)');
+    } else if (typeof sslConfig === 'object' && sslConfig.rejectUnauthorized) {
+      this.logger.log('SSL: enabled with CA verification (production)');
     } else {
-      console.log('[Prisma] SSL: enabled without CA verification');
+      this.logger.log('SSL: enabled without CA verification');
     }
   }
 
@@ -77,12 +74,12 @@ export class PrismaService
           const url = new URL(dsn);
           // Avoid leaking credentials
           const masked = `${url.protocol}//${url.hostname}:${url.port || '5432'}${url.pathname}`;
-          console.log('[Prisma] DATABASE_URL →', masked);
+          this.logger.log(`DATABASE_URL → ${masked}`);
         } catch {
-          console.log('[Prisma] DATABASE_URL present but could not be parsed');
+          this.logger.log('DATABASE_URL present but could not be parsed');
         }
       } else {
-        console.log('[Prisma] DATABASE_URL is not set');
+        this.logger.warn('DATABASE_URL is not set');
       }
     } catch {
       // ignore
@@ -97,8 +94,8 @@ export class PrismaService
       `;
       if (Array.isArray(rows) && rows[0]) {
         const { db, host, port } = rows[0];
-        console.log(
-          `[Prisma] Connected to db=${db} host=${host ?? 'unknown'} port=${port ?? 'unknown'}`,
+        this.logger.log(
+          `Connected to db=${db} host=${host ?? 'unknown'} port=${port ?? 'unknown'}`,
         );
       }
     } catch {

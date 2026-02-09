@@ -29,7 +29,6 @@ export function getEffectiveCorsAllowlist(): string[] {
 export function getCorsOptions(): CorsOptions {
   const isProd = process.env.NODE_ENV === 'production';
   const allowlist = getEffectiveCorsAllowlist();
-  const vercelWildcard = /\.vercel\.app$/i;
   // ALLOW_ALL_CORS is only respected in non-production environments
   const allowAll = !isProd && process.env.ALLOW_ALL_CORS === '1';
 
@@ -52,11 +51,21 @@ export function getCorsOptions(): CorsOptions {
         return callback(null, false);
       }
 
+      // Explicit subdomain allowlist — prevent dangling CNAME abuse
+      const ALLOWED_SUBDOMAINS = [
+        'tattmap.com',
+        'www.tattmap.com',
+        'api.tattmap.com',
+        'dev.tattmap.com',
+        'staging.tattmap.com',
+      ];
+
+      // Only allow Vercel previews matching our project prefix
+      const isVercelPreview =
+        isProd && /^tattoo-map-[\w-]+\.vercel\.app$/i.test(hostname);
+
       const isAllowedHostname =
-        hostname === 'tattmap.com' ||
-        hostname === 'www.tattmap.com' ||
-        hostname.endsWith('.tattmap.com') ||
-        (isProd && vercelWildcard.test(hostname));
+        ALLOWED_SUBDOMAINS.includes(hostname) || isVercelPreview;
 
       const allowed =
         allowAll || allowlist.includes(origin) || isAllowedHostname;

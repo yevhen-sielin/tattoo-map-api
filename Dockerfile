@@ -4,7 +4,7 @@
   
   # системные либы для swc/openssl и pnpm
   RUN apk add --no-cache openssl libc6-compat
-  RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
+  RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
   
   # deps + генерация клиента
   COPY package.json pnpm-lock.yaml ./
@@ -37,7 +37,7 @@
   ENV NODE_ENV=production
   
   RUN apk add --no-cache openssl libc6-compat
-  RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
+  RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
   
   # 1) манифесты пакетов
   COPY package.json pnpm-lock.yaml ./

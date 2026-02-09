@@ -4,7 +4,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BboxQueryDto {
   @ApiPropertyOptional({
-    description: 'ISO 3166-1 alpha-2 country code to filter points (e.g. DE, US)',
+    description:
+      'ISO 3166-1 alpha-2 country code to filter points (e.g. DE, US)',
     example: 'DE',
   })
   @IsOptional()

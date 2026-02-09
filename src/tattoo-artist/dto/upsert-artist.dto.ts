@@ -1,14 +1,18 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEmail,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -55,7 +59,10 @@ export class UpsertArtistDto {
     example: ['Realism', 'Blackwork'],
   })
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
   @IsString({ each: true })
+  @MaxLength(50, { each: true })
   styles!: string[];
 
   @ApiProperty({ description: 'Instagram handle', example: 'inkmaster_berlin' })
@@ -119,7 +126,9 @@ export class UpsertArtistDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
+  @MaxLength(500, { each: true })
   photos?: string[];
 
   @IsOptional()
@@ -177,5 +186,11 @@ export class UpsertArtistDto {
   routableLon?: number | null;
 
   @IsOptional()
+  @IsObject()
+  @ValidateIf((_o, v) => v != null)
   geoRaw?: Record<string, unknown>;
 }
+
+// Custom validation: geoRaw must not exceed 10 KB when serialized.
+// Applied via the @ValidateIf + service-level check since class-validator
+// doesn't have a built-in JSON size validator.

@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Query,
@@ -17,12 +19,13 @@ import {
 } from '@nestjs/swagger';
 import { TattooArtistService } from './tattoo-artist.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/auth.controller';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User as JwtUser } from '../auth/types';
 import { SearchArtistsDto } from './dto/search-artists.dto';
 import { UpsertArtistDto } from './dto/upsert-artist.dto';
 import { BboxQueryDto } from './dto/bbox-query.dto';
-import { DEFAULT_SEARCH_LIMIT } from '../config/constants';
+import { FindByIdsDto } from './dto/find-by-ids.dto';
+import { DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT } from '../config/constants';
 
 @ApiTags('Tattoo Artists')
 @Controller('tattoo-artist')
@@ -95,16 +98,17 @@ export class TattooArtistController {
     summary:
       'Fetch artists by a list of user IDs (used for cluster drill-down)',
   })
-  findByIds(@Body() body: { userIds: string[] }) {
-    const ids = Array.isArray(body.userIds) ? body.userIds.slice(0, 1000) : [];
-    return this.tattooArtistService.findByUserIds(ids);
+  findByIds(@Body() body: FindByIdsDto) {
+    return this.tattooArtistService.findByUserIds(body.userIds);
   }
 
   @Get('top')
   @ApiOperation({ summary: 'Get top artists sorted by likes' })
-  async top(@Query('limit') limit?: string) {
-    const lim = limit != null ? Number(limit) : undefined;
-    return this.tattooArtistService.topByLikes(lim);
+  async top(
+    @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
+  ) {
+    const clamped = Math.max(1, Math.min(limit, MAX_SEARCH_LIMIT));
+    return this.tattooArtistService.topByLikes(clamped);
   }
 
   @Get(':id')

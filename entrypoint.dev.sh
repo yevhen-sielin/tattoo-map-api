@@ -8,9 +8,9 @@ log() { printf "\033[1;34m[backend]\033[0m %s\n" "$*"; }
 echo "[entrypoint] node: $(node -v)  pnpm: $(pnpm -v)"
 echo "[entrypoint] CWD: $(pwd)"
 
-# Ensure Prisma has the right URLs
-echo "[entrypoint] DATABASE_URL=$DATABASE_URL"
-echo "[entrypoint] DIRECT_URL=$DIRECT_URL"
+# Confirm Prisma URLs are set (values masked for security)
+echo "[entrypoint] DATABASE_URL=${DATABASE_URL:+set (masked)}"
+echo "[entrypoint] DIRECT_URL=${DIRECT_URL:+set (masked)}"
 
 
 # --- Optional: wait for Postgres if needed ---

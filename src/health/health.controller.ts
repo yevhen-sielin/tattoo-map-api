@@ -1,6 +1,7 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 
 interface HealthResponse {
@@ -20,13 +21,17 @@ export class HealthController {
 
   @Get()
   @ApiOperation({ summary: 'Health check with database connectivity' })
-  async check(): Promise<HealthResponse> {
+  async check(@Res() res: Response): Promise<void> {
     const timestamp = new Date().toISOString();
     const isProd = process.env.NODE_ENV === 'production';
 
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-      return { status: 'ok', timestamp, database: 'connected' };
+      res.status(200).json({
+        status: 'ok',
+        timestamp,
+        database: 'connected',
+      } satisfies HealthResponse);
     } catch (err) {
       // Always log the full error server-side for debugging
       this.logger.error(
@@ -34,7 +39,8 @@ export class HealthController {
         err instanceof Error ? err.stack : err,
       );
 
-      return {
+      // Return 503 so ALB/ECS health checks remove unhealthy containers
+      res.status(503).json({
         status: 'error',
         timestamp,
         database: 'disconnected',
@@ -44,7 +50,7 @@ export class HealthController {
           : err instanceof Error
             ? err.message
             : 'Unknown database error',
-      };
+      } satisfies HealthResponse);
     }
   }
 }

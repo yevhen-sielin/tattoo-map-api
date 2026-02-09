@@ -10,7 +10,7 @@ import { Throttle } from '@nestjs/throttler';
 import { IsNotEmpty, IsString, IsIn, MaxLength } from 'class-validator';
 import { UploadsService } from './uploads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/auth.controller';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User as JwtUser } from '../auth/types';
 
 /** Only image MIME types are accepted for uploads */

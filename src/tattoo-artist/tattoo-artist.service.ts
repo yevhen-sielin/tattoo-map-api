@@ -59,13 +59,6 @@ export class TattooArtistService {
 
   // ── queries ──────────────────────────────────────────────────────────────
 
-  async findAll() {
-    const artists = await this.prisma.artist.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
-    return artists.map(mapArtistToDto);
-  }
-
   /**
    * Lightweight endpoint for map rendering.
    * Returns only the minimal fields needed for pins / clusters:
@@ -150,7 +143,6 @@ export class TattooArtistService {
     });
 
     const normalized = artists.map(mapArtistToDto);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return this.attachLikeCounts(normalized);
   }
 
@@ -186,7 +178,6 @@ export class TattooArtistService {
     const hasMore = artists.length > limit;
     const trimmed = hasMore ? artists.slice(0, limit) : artists;
     const normalized = trimmed.map(mapArtistToDto);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const withLikes = await this.attachLikeCounts(normalized);
     return { data: withLikes, total, hasMore };
   }
@@ -201,34 +192,44 @@ export class TattooArtistService {
     skip: number,
   ) {
     const radiusMeters = params.radiusKm! * 1000;
-    const center = `ST_SetSRID(ST_MakePoint(${params.centerLon!}, ${params.centerLat!}), 4326)::geography`;
+
+    // All user-supplied values go through positional $N parameters
+    const values: (number | string)[] = [];
+    let idx = 1;
+
+    // Geo params: $1 = centerLon, $2 = centerLat, $3 = radiusMeters
+    values.push(params.centerLon!, params.centerLat!);
+    const centerExpr = `ST_SetSRID(ST_MakePoint($${idx}, $${idx + 1}), 4326)::geography`;
+    idx += 2;
+
+    values.push(radiusMeters);
+    const radiusParam = `$${idx}`;
+    idx++;
 
     // Build optional WHERE clauses for non-geo filters
     const clauses: string[] = [
       `"location" IS NOT NULL`,
-      `ST_DWithin("location", ${center}, ${radiusMeters})`,
+      `ST_DWithin("location", ${centerExpr}, ${radiusParam})`,
     ];
-    const values: unknown[] = [];
-    let paramIdx = 1;
 
     if (params.countryCode?.trim()) {
       const cc = params.countryCode.trim().toUpperCase();
-      clauses.push(`UPPER("countryCode") = $${paramIdx}`);
+      clauses.push(`UPPER("countryCode") = $${idx}`);
       values.push(cc);
-      paramIdx++;
+      idx++;
     }
     if (params.city?.trim()) {
-      clauses.push(`"city" ILIKE $${paramIdx}`);
+      clauses.push(`"city" ILIKE $${idx}`);
       values.push(`%${params.city.trim()}%`);
-      paramIdx++;
+      idx++;
     }
     if (params.q?.trim()) {
       const pattern = `%${params.q.trim()}%`;
       clauses.push(
-        `("nickname" ILIKE $${paramIdx} OR "city" ILIKE $${paramIdx} OR "country" ILIKE $${paramIdx})`,
+        `("nickname" ILIKE $${idx} OR "city" ILIKE $${idx} OR "country" ILIKE $${idx})`,
       );
       values.push(pattern);
-      paramIdx++;
+      idx++;
     }
     if (params.beginner) {
       clauses.push(`"beginner" = true`);
@@ -245,19 +246,32 @@ export class TattooArtistService {
 
     const whereSQL = clauses.join(' AND ');
 
-    // Count + fetch in parallel using raw SQL
+    // Count query uses only WHERE params (snapshot before LIMIT/OFFSET)
     const countQuery = `SELECT COUNT(*)::int AS total FROM "Artist" WHERE ${whereSQL}`;
+    const countValues = [...values];
+
+    // Data query adds LIMIT and OFFSET as positional params
+    values.push(limit + 1);
+    const limitParam = `$${idx}`;
+    idx++;
+
+    values.push(skip);
+    const offsetParam = `$${idx}`;
+
     const dataQuery = `
       SELECT *,
-             ST_Distance("location", ${center}) AS "_distanceMeters"
+             ST_Distance("location", ${centerExpr}) AS "_distanceMeters"
       FROM "Artist"
       WHERE ${whereSQL}
       ORDER BY "_distanceMeters" ASC
-      LIMIT ${limit + 1} OFFSET ${skip}
+      LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
     const [countRows, artists] = await Promise.all([
-      this.prisma.$queryRawUnsafe<{ total: number }[]>(countQuery, ...values),
+      this.prisma.$queryRawUnsafe<{ total: number }[]>(
+        countQuery,
+        ...countValues,
+      ),
       this.prisma.$queryRawUnsafe<
         Array<{
           userId: string;
@@ -272,7 +286,6 @@ export class TattooArtistService {
     const hasMore = artists.length > limit;
     const trimmed = hasMore ? artists.slice(0, limit) : artists;
     const normalized = trimmed.map(mapArtistToDto);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     const withLikes = await this.attachLikeCounts(normalized);
     return { data: withLikes, total, hasMore };
   }
@@ -365,7 +378,6 @@ export class TattooArtistService {
       where: { artistId: { in: artists.map((a) => a.userId) } },
     });
     const mapCount = new Map<string, number>(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       counts.map((c): [string, number] => [c.artistId, c._count.artistId]),
     );
     return artists.map((a) => ({ ...a, likes: mapCount.get(a.userId) ?? 0 }));
@@ -475,6 +487,16 @@ export class TattooArtistService {
       geoRaw?: Record<string, unknown>;
     },
   ) {
+    // Guard against oversized geoRaw payloads (max 10 KB)
+    if (data.geoRaw) {
+      const geoSize = JSON.stringify(data.geoRaw).length;
+      if (geoSize > 10_000) {
+        throw new BadRequestException(
+          `geoRaw payload too large (${geoSize} chars, max 10000)`,
+        );
+      }
+    }
+
     const countryCode =
       data.countryCode && data.countryCode.trim()
         ? data.countryCode.trim().toUpperCase()
