@@ -67,8 +67,10 @@
   EXPOSE 3000
   
   # --- старт ---
-  # Migrations are applied separately (CI or manual).
-  # Previously `pnpm dlx prisma migrate deploy && node ...` was used here,
-  # but the `&&` caused ECS to roll back when the migration step failed
-  # (e.g. missing ts-node for prisma.config.ts in the runtime image).
+  # Optional: run migrations on startup if RUN_MIGRATIONS=true
+  # Use this for dev/staging environments. For prod, apply migrations manually.
+  COPY docker-entrypoint.sh /app/
+  RUN chmod +x /app/docker-entrypoint.sh
+  
+  ENTRYPOINT ["/app/docker-entrypoint.sh"]
   CMD ["node", "dist/src/main.js"]
