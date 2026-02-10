@@ -1,0 +1,46 @@
+name: Apply Migrations to Dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "migrate" to confirm'
+        required: true
+        default: ''
+
+jobs:
+  migrate:
+    name: Run Prisma Migrate
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'migrate'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Enable Corepack
+        run: corepack enable
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Apply migrations
+        run: pnpm prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+      
+      - name: Verify migration
+        run: |
+          echo "Migration completed successfully"
+          pnpm prisma db execute --stdin <<EOF
+          SELECT column_name, data_type 
+          FROM information_schema.columns 
+          WHERE table_name = 'Artist' AND column_name = 'countryCodeAlpha3';
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
