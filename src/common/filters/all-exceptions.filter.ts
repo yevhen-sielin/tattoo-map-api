@@ -36,10 +36,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : 'Internal server error';
 
     // Always log full details server-side
-    this.logger.error(
-      `${request.method} ${request.url} → ${status}`,
-      exception instanceof Error ? exception.stack : String(exception),
-    );
+    if (exception instanceof HttpException) {
+      const response = exception.getResponse();
+      this.logger.error(
+        `${request.method} ${request.url} → ${status}`,
+        JSON.stringify(response, null, 2),
+      );
+    } else {
+      this.logger.error(
+        `${request.method} ${request.url} → ${status}`,
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+    }
 
     if (this.isProd) {
       // Production: never leak internals
