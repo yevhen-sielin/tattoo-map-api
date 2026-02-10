@@ -53,7 +53,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception instanceof HttpException
           ? exception.getResponse()
           : exception instanceof Error
-            ? { name: exception.name, message: exception.message, stack: exception.stack }
+            ? {
+                name: exception.name,
+                message: exception.message,
+                stack: exception.stack,
+              }
             : { error: String(exception) };
 
       response.status(status).json({
