@@ -90,7 +90,6 @@ export class UploadsService {
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
-      ContentLength: UploadsService.MAX_UPLOAD_BYTES,
     };
 
     try {
