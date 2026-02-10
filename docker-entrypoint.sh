@@ -6,7 +6,8 @@ echo "Starting Tattoo Map API..."
 # Run migrations if RUN_MIGRATIONS is set to 'true'
 if [ "$RUN_MIGRATIONS" = "true" ]; then
   echo "RUN_MIGRATIONS=true → Applying database migrations..."
-  npx -y prisma migrate deploy
+  # Use pnpm exec to use local installed prisma (no download needed)
+  pnpm exec prisma migrate deploy
   if [ $? -eq 0 ]; then
     echo "✓ Migrations applied successfully"
   else
