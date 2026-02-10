@@ -10,6 +10,7 @@ import {
   getCorsOptions,
   getEffectiveCorsAllowlist,
 } from './config/cors.config';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { DEFAULT_PORT } from './config/constants';
 
@@ -37,7 +38,10 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new PrismaExceptionFilter());
+  // Order matters: NestJS evaluates filters in reverse registration order.
+  // AllExceptionsFilter is the catch-all fallback; PrismaExceptionFilter
+  // handles Prisma errors specifically (registered last = checked first).
+  app.useGlobalFilters(new AllExceptionsFilter(), new PrismaExceptionFilter());
 
   // ---------- CORS ----------
   app.enableCors(getCorsOptions());
