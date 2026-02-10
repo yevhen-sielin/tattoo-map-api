@@ -67,8 +67,5 @@
   EXPOSE 3000
   
   # --- старт ---
-  # Migrations are applied separately (CI or manual).
-  # Previously `pnpm dlx prisma migrate deploy && node ...` was used here,
-  # but the `&&` caused ECS to roll back when the migration step failed
-  # (e.g. missing ts-node for prisma.config.ts in the runtime image).
-  CMD ["node", "dist/src/main.js"]
+  # TEMPORARY: Apply migrations on startup for dev environment
+  CMD ["sh", "-c", "npx -y prisma migrate deploy && node dist/src/main.js"]
