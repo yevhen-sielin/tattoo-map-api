@@ -33,6 +33,15 @@ export class UpsertArtistDto {
   @MaxLength(10)
   countryCode?: string | null;
 
+  @ApiPropertyOptional({
+    description: 'ISO-3 country code',
+    example: 'DEU',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  countryCodeAlpha3?: string | null;
+
   @ApiProperty({
     description: 'Full working address',
     example: 'Friedrichstraße 123, Berlin',
@@ -87,10 +96,12 @@ export class UpsertArtistDto {
   blackAndGray?: boolean;
 
   @IsOptional()
+  @ValidateIf((_o, v) => v !== '' && v != null)
   @IsEmail()
   email?: string | null;
 
   @IsOptional()
+  @ValidateIf((_o, v) => v !== '' && v != null)
   @IsUrl()
   website?: string | null;
 

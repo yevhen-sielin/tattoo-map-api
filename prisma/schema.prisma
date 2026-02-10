@@ -32,10 +32,11 @@ model Artist {
   userId         String   @id
   user           User     @relation(fields: [userId], references: [id])
 
-  city           String
-  country        String
-  countryCode    String?  @db.VarChar(2)
-  address        String
+  city              String
+  country           String
+  countryCode       String?  @db.VarChar(2)
+  countryCodeAlpha3 String?  @db.VarChar(3)
+  address           String
   nickname       String
   description    String
   styles         String[]
